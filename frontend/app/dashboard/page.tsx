@@ -15,14 +15,14 @@ export default function DashboardPage() {
           <h2>首页</h2>
           <p>Project Kizuna 已进入生产使用阶段。请从工作项中心开始处理客服消息。</p>
         </div>
-        <div className="summary-pill">工作项中心 v0.3.2</div>
+        <div className="summary-pill">工作项中心 v0.3.3</div>
       </div>
 
       <div className="grid grid-4">
         <div className="card status-card"><span>API</span><strong>正常</strong></div>
         <div className="card status-card"><span>数据库</span><strong>正常</strong></div>
         <div className="card status-card"><span>S3</span><strong>已接通</strong></div>
-        <div className="card status-card"><span>AI</span><strong>待配置</strong></div>
+        <div className="card status-card"><span>AI</span><strong>回复助手</strong></div>
       </div>
 
       <div className="module-grid">

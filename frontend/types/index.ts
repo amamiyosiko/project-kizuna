@@ -145,3 +145,18 @@ export type TicketStats = {
   high_risk: number;
   today_created: number;
 };
+
+export type TicketAIReply = {
+  ticket_id: number;
+  source_message_id: number;
+  category: string;
+  detected_intent?: string;
+  risk_level: string;
+  confidence_score: number;
+  recommended_action?: string;
+  auto_reply_allowed: boolean;
+  reason?: string;
+  tone: string;
+  reply_text: string;
+  source_excerpt?: string;
+};

@@ -4,11 +4,36 @@ from sqlalchemy.orm import Session
 from app.ai.classifier import simple_classify
 from app.ai.reply_generator import generate_rule_based_reply
 from app.core.config import settings
+from app.core.deps import get_current_user
 from app.db.session import get_db
-from app.models import AIReply, Message
-from app.schemas.ai_reply import AIReplyOut, ApproveReplyRequest, GenerateReplyRequest
+from app.models import AIReply, Message, Ticket, TicketEvent, TicketMessage, User
+from app.schemas.ai_reply import (
+    AIReplyOut,
+    ApproveReplyRequest,
+    GenerateReplyRequest,
+    TicketAIReplyOut,
+    TicketGenerateReplyRequest,
+)
 
 router = APIRouter(prefix="/ai", tags=["ai"])
+
+
+def _add_ticket_event(
+    db: Session,
+    ticket_id: int,
+    event_type: str,
+    title: str,
+    description: str | None = None,
+    actor: User | None = None,
+) -> None:
+    db.add(TicketEvent(
+        ticket_id=ticket_id,
+        event_type=event_type,
+        title=title,
+        description=description,
+        actor_type="USER" if actor else "SYSTEM",
+        actor_user_id=actor.id if actor else None,
+    ))
 
 
 @router.post("/classify")
@@ -54,3 +79,54 @@ def approve_reply(reply_id: int, payload: ApproveReplyRequest, db: Session = Dep
     db.commit()
     db.refresh(reply)
     return reply
+
+
+@router.post("/tickets/{ticket_id}/generate-reply", response_model=TicketAIReplyOut)
+def generate_ticket_reply(
+    ticket_id: int,
+    payload: TicketGenerateReplyRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Generate a Japanese draft reply for a work item.
+
+    v0.3.3 keeps the workflow safe and deterministic: AI produces a draft and
+    analysis, but it does not send anything to Amazon. The agent can copy the
+    draft into the reply box, edit it, and save it to the ticket timeline.
+    """
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="ticket not found")
+
+    source_query = db.query(TicketMessage).filter(TicketMessage.ticket_id == ticket.id)
+    if payload.message_id:
+        source_query = source_query.filter(TicketMessage.id == payload.message_id)
+    else:
+        source_query = source_query.filter(TicketMessage.sender_type == "CUSTOMER")
+
+    source_message = source_query.order_by(TicketMessage.id.desc()).first()
+    if not source_message:
+        raise HTTPException(status_code=404, detail="customer message not found")
+
+    generated = generate_rule_based_reply(source_message.content, tone=payload.tone)
+    description = (
+        f"分类：{generated['category']} / 风险：{generated['risk_level']} / "
+        f"可信度：{generated['confidence_score']}%"
+    )
+    _add_ticket_event(db, ticket.id, "AI_REPLY_GENERATED", "AI 回复草稿已生成", description, current_user)
+    db.commit()
+
+    return TicketAIReplyOut(
+        ticket_id=ticket.id,
+        source_message_id=source_message.id,
+        category=generated["category"],
+        detected_intent=generated.get("detected_intent"),
+        risk_level=generated["risk_level"],
+        confidence_score=float(generated["confidence_score"] or 0),
+        recommended_action=generated.get("recommended_action"),
+        auto_reply_allowed=bool(generated.get("auto_reply_allowed")),
+        reason=generated.get("reason"),
+        tone=generated.get("tone") or payload.tone,
+        reply_text=generated["reply"],
+        source_excerpt=(source_message.content or "")[:300],
+    )

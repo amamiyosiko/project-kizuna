@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { apiFetch, apiFetchForm } from "@/lib/api";
-import type { Attachment, Store, Ticket, TicketEvent, TicketMessage, TicketStats } from "@/types";
+import type { Attachment, Store, Ticket, TicketAIReply, TicketEvent, TicketMessage, TicketStats } from "@/types";
 
 const statusTabs = [
   { label: "全部", value: "" },
@@ -92,6 +92,9 @@ export default function WorkspacePage() {
   const [showCreate, setShowCreate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiTone, setAiTone] = useState("polite");
+  const [aiDraft, setAiDraft] = useState<TicketAIReply | null>(null);
   const [agentReply, setAgentReply] = useState("");
   const [customerMessage, setCustomerMessage] = useState("");
   const [form, setForm] = useState({
@@ -144,6 +147,7 @@ export default function WorkspacePage() {
     setActive(ticket);
     setAgentReply("");
     setCustomerMessage("");
+    setAiDraft(null);
     const [m, e, a] = await Promise.all([
       apiFetch<TicketMessage[]>(`/tickets/${ticket.id}/messages`),
       apiFetch<TicketEvent[]>(`/tickets/${ticket.id}/events`),
@@ -204,6 +208,43 @@ export default function WorkspacePage() {
     }
   }
 
+  async function generateAiReply() {
+    if (!active) return;
+    setAiBusy(true);
+    try {
+      const generated = await apiFetch<TicketAIReply>(`/ai/tickets/${active.id}/generate-reply`, {
+        method: "POST",
+        body: JSON.stringify({ tone: aiTone }),
+      });
+      setAiDraft(generated);
+      const e = await apiFetch<TicketEvent[]>(`/tickets/${active.id}/events`);
+      setEvents(e);
+    } catch (err) {
+      alert(err instanceof Error ? `AI生成失败：${err.message}` : "AI生成失败，请稍后重试。");
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function saveAiDraftToTimeline() {
+    if (!active || !aiDraft?.reply_text.trim()) return;
+    setAiBusy(true);
+    try {
+      await apiFetch<TicketMessage>(`/tickets/${active.id}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ sender_type: "AI", content: aiDraft.reply_text.trim() }),
+      });
+      await refreshActive(active.id);
+    } finally {
+      setAiBusy(false);
+    }
+  }
+
+  async function applyAiAnalysis() {
+    if (!active || !aiDraft) return;
+    await updateTicket({ category: aiDraft.category, risk_level: aiDraft.risk_level });
+  }
+
   async function uploadAttachment(file?: File) {
     if (!active || !file) return;
     setUploadBusy(true);
@@ -231,7 +272,7 @@ export default function WorkspacePage() {
         <aside className="panel ticket-nav">
           <div className="workspace-brand">
             <strong>工作项中心</strong>
-            <span>生产使用版 v0.3.2.1</span>
+            <span>生产使用版 v0.3.3</span>
           </div>
           <button className="btn full" onClick={() => setShowCreate(true)}>＋ 新建工作项</button>
           <input className="input" placeholder="搜索编号 / 买家 / 订单 / SKU" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") loadTickets(); }} />
@@ -338,6 +379,40 @@ export default function WorkspacePage() {
             <div><span>负责人</span><strong>{active?.assigned_user_id || "未分配"}</strong></div>
           </div>
 
+          {active && <div className="ticket-ai-assistant">
+            <div className="ai-assistant-head">
+              <div>
+                <strong>AI 回复助手</strong>
+                <span>根据最新买家消息生成日文回复草稿</span>
+              </div>
+              <select className="select" value={aiTone} onChange={e => setAiTone(e.target.value)}>
+                <option value="polite">标准礼貌</option>
+                <option value="apology">加强道歉</option>
+                <option value="short">简短回复</option>
+              </select>
+            </div>
+            <button className="btn full" disabled={aiBusy || !messages.some(m => m.sender_type === "CUSTOMER")} onClick={generateAiReply}>
+              {aiBusy ? "AI生成中..." : "生成AI日文回复"}
+            </button>
+            {!messages.some(m => m.sender_type === "CUSTOMER") && <p className="muted">需要先有买家消息，才能生成回复。</p>}
+            {aiDraft && <div className="ai-draft-box">
+              <div className="ai-draft-meta">
+                <span>分类：<strong>{aiDraft.category}</strong></span>
+                <span>风险：<strong>{riskLabel[aiDraft.risk_level] || aiDraft.risk_level}</strong></span>
+                <span>可信度：<strong>{aiDraft.confidence_score}%</strong></span>
+              </div>
+              <p className="ai-recommendation">{aiDraft.recommended_action || "建议人工确认后回复。"}</p>
+              <textarea className="textarea compact ai-draft-text" value={aiDraft.reply_text} onChange={e => setAiDraft({ ...aiDraft, reply_text: e.target.value })} />
+              <div className="ai-action-grid">
+                <button className="btn secondary" type="button" onClick={() => setAgentReply(aiDraft.reply_text)}>填入客服回复</button>
+                <button className="btn secondary" type="button" disabled={aiBusy} onClick={saveAiDraftToTimeline}>保存为AI消息</button>
+                <button className="btn secondary" type="button" onClick={applyAiAnalysis}>应用分类/风险</button>
+              </div>
+              <small className="ai-source">来源消息：{aiDraft.source_excerpt || "-"}</small>
+              {aiDraft.reason && <small className="ai-source">判断依据：{aiDraft.reason}</small>}
+            </div>}
+          </div>}
+
           {active && <div className="detail-edit-box">
             <label>分类</label>
             <select className="select" value={active.category || ""} onChange={e => updateTicket({ category: e.target.value })}>
@@ -387,7 +462,7 @@ export default function WorkspacePage() {
             {active && !events.length && <p className="muted">暂无时间轴。</p>}
             {!active && <p className="muted">选择工作项后显示操作记录。</p>}
           </div>
-          <div className="note-box">v0.3.2.1 修复附件上传：改为后端直传 S3，避免浏览器直传失败导致不写入数据库。</div>
+          <div className="note-box">v0.3.3 增加 AI 回复助手：先生成日文草稿，不自动发送 Amazon；客服确认后再保存。</div>
         </aside>
 
         {showCreate && <div className="modal-backdrop">

@@ -23,3 +23,23 @@ class AIReplyOut(ORMBase):
     final_reply_text: str | None
     confidence_score: float | None
     status: str | None
+
+
+class TicketGenerateReplyRequest(BaseModel):
+    message_id: int | None = None
+    tone: str = "polite"
+
+
+class TicketAIReplyOut(BaseModel):
+    ticket_id: int
+    source_message_id: int
+    category: str
+    detected_intent: str | None = None
+    risk_level: str
+    confidence_score: float
+    recommended_action: str | None = None
+    auto_reply_allowed: bool = False
+    reason: str | None = None
+    tone: str = "polite"
+    reply_text: str
+    source_excerpt: str | None = None
