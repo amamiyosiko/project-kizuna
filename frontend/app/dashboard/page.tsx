@@ -1,28 +1,38 @@
 import AppShell from "@/components/AppShell";
 
-const kpis = [
-  ["今日消息", "126"],
-  ["未处理", "18"],
-  ["AI待确认", "7"],
-  ["高风险", "3"]
+const items = [
+  { title: "工作项中心", desc: "查看和处理 Amazon 买家售后问题", href: "/workspace", icon: "🎫" },
+  { title: "店铺管理", desc: "维护 Amazon JP 店铺信息", href: "/stores", icon: "🏪" },
+  { title: "回复模板", desc: "管理常用日语客服回复", href: "/templates", icon: "💬" },
+  { title: "知识库", desc: "维护 AI 回复依据和售后规则", href: "/knowledge", icon: "📚" },
 ];
 
 export default function DashboardPage() {
   return (
     <AppShell>
-      <h2>Dashboard 总览</h2>
-      <div className="grid grid-4">
-        {kpis.map(([label, value]) => <div className="card" key={label}><div>{label}</div><div className="kpi">{value}</div></div>)}
+      <div className="page-header">
+        <div>
+          <h2>首页</h2>
+          <p>Project Kizuna 已进入生产使用阶段。请从工作项中心开始处理客服消息。</p>
+        </div>
+        <div className="summary-pill">工作项中心 v0.3.1</div>
       </div>
-      <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", marginTop: 16 }}>
-        <div className="card">
-          <h3>按店铺消息量</h3>
-          <table><tbody>{["Amazon店A", "Amazon店B", "Amazon店C"].map((s, i) => <tr key={s}><td>{s}</td><td>{[32, 21, 14][i]}</td></tr>)}</tbody></table>
-        </div>
-        <div className="card">
-          <h3>售后分类</h3>
-          <table><tbody>{[["配送未到", 42], ["返品希望", 18], ["商品破损", 6], ["差评风险", 3]].map(([c, n]) => <tr key={c}><td>{c}</td><td>{n}</td></tr>)}</tbody></table>
-        </div>
+
+      <div className="grid grid-4">
+        <div className="card status-card"><span>API</span><strong>正常</strong></div>
+        <div className="card status-card"><span>数据库</span><strong>正常</strong></div>
+        <div className="card status-card"><span>S3</span><strong>已接通</strong></div>
+        <div className="card status-card"><span>AI</span><strong>待配置</strong></div>
+      </div>
+
+      <div className="module-grid">
+        {items.map(item => (
+          <a className="module-card" href={item.href} key={item.href}>
+            <span>{item.icon}</span>
+            <strong>{item.title}</strong>
+            <p>{item.desc}</p>
+          </a>
+        ))}
       </div>
     </AppShell>
   );

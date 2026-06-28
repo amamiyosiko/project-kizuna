@@ -199,3 +199,56 @@ th { color: #6b7280; font-weight: 600; }
 .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 1400px) { .ticket-workspace { grid-template-columns: 240px 330px 1fr; } .ticket-ai-panel { grid-column: 1 / -1; min-height: 280px; } }
 @media (max-width: 980px) { .ticket-workspace { height: auto; grid-template-columns: 1fr; } .ticket-header, .agent-reply-box, .modal-grid { grid-template-columns: 1fr; display: grid; } .ticket-header-actions { width: 100%; } .ticket-context-strip { grid-template-columns: 1fr 1fr; } }
+
+/* v0.2.5 中文后台框架 */
+.admin-layout { min-height: 100vh; display: grid; grid-template-columns: 240px 1fr; background: #f3f6fb; color: #0f172a; }
+.admin-sidebar { background: #0f172a; color: #e2e8f0; display: flex; flex-direction: column; padding: 18px 14px; min-height: 100vh; }
+.admin-brand { display: flex; align-items: center; gap: 12px; padding: 4px 6px 18px; border-bottom: 1px solid rgba(255,255,255,.08); }
+.admin-brand strong { display: block; color: #fff; font-size: 16px; }
+.admin-brand span { display: block; color: #94a3b8; font-size: 12px; margin-top: 3px; }
+.brand-mark.small { width: 38px; height: 38px; font-size: 18px; margin: 0; }
+.admin-nav { display: grid; gap: 6px; padding: 16px 0; }
+.admin-nav a { color: #cbd5e1; text-decoration: none; border-radius: 12px; padding: 11px 12px; display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.admin-nav a:hover, .admin-nav a.active { background: rgba(59, 130, 246, .18); color: #fff; }
+.admin-nav a span { width: 24px; text-align: center; }
+.admin-sidebar-footer { margin-top: auto; border-top: 1px solid rgba(255,255,255,.08); padding: 14px 8px 4px; display: flex; justify-content: space-between; color: #94a3b8; font-size: 12px; }
+.admin-sidebar-footer strong { color: #fff; }
+.admin-main-shell { min-width: 0; display: flex; flex-direction: column; min-height: 100vh; }
+.admin-header { height: 64px; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; position: sticky; top: 0; z-index: 20; }
+.header-search { width: min(520px, 46vw); background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 999px; padding: 9px 14px; display: flex; align-items: center; gap: 8px; }
+.header-search input { border: 0; outline: 0; background: transparent; width: 100%; color: #334155; }
+.header-actions { display: flex; gap: 12px; align-items: center; }
+.system-status { color: #16a34a; font-size: 13px; font-weight: 800; background: #dcfce7; border-radius: 999px; padding: 7px 10px; }
+.admin-content { padding: 18px; min-width: 0; }
+.status-card { display: grid; gap: 10px; }
+.status-card span { color: #64748b; font-size: 13px; }
+.status-card strong { color: #0f172a; font-size: 24px; }
+.module-grid { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 14px; margin-top: 16px; }
+.module-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px; text-decoration: none; color: #0f172a; box-shadow: 0 8px 24px rgba(15,23,42,.04); display: grid; gap: 8px; }
+.module-card:hover { border-color: #bfdbfe; box-shadow: 0 12px 32px rgba(37,99,235,.08); }
+.module-card span { font-size: 24px; }
+.module-card strong { font-size: 17px; }
+.module-card p { margin: 0; color: #64748b; line-height: 1.6; }
+.empty-module { min-height: 220px; display: grid; align-content: center; justify-items: start; gap: 8px; }
+.empty-module h3 { margin: 0; }
+.empty-module p { margin: 0; color: #64748b; }
+@media (max-width: 980px) { .admin-layout { grid-template-columns: 1fr; } .admin-sidebar { min-height: auto; } .admin-nav { grid-template-columns: repeat(2, 1fr); } .admin-header { position: static; gap: 10px; flex-wrap: wrap; height: auto; padding: 12px; } .header-search { width: 100%; } .module-grid { grid-template-columns: 1fr; } }
+
+/* v0.3.1 Work Center polish */
+.ticket-workspace.v031 { grid-template-columns: 270px 360px minmax(500px, 1fr) 380px; }
+.workspace-stats-mini { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0 4px; }
+.workspace-stats-mini div { border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 12px; padding: 9px 10px; display: grid; gap: 3px; }
+.workspace-stats-mini span { color: #64748b; font-size: 12px; }
+.workspace-stats-mini strong { color: #0f172a; font-size: 18px; }
+.filter-label { display: block; color: #475569; font-size: 12px; font-weight: 800; margin: 0 0 6px; }
+.filter-label.top-gap { margin-top: 12px; }
+.status-flow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 0 0 12px; }
+.status-flow button { border: 1px solid #dbeafe; color: #1d4ed8; background: #eff6ff; border-radius: 10px; padding: 8px 10px; cursor: pointer; font-size: 13px; font-weight: 700; }
+.status-flow button:hover { background: #dbeafe; }
+.status-flow button:disabled { opacity: .5; cursor: not-allowed; }
+.agent-reply-box.stacked { grid-template-columns: 1fr 150px; }
+.detail-edit-box, .customer-message-box { display: grid; gap: 8px; border-top: 1px solid #eef2f7; padding-top: 10px; margin-top: 10px; }
+.detail-edit-box label, .customer-message-box label { color: #475569; font-size: 13px; font-weight: 800; }
+.customer-message-box .btn.full { margin: 0; }
+@media (max-width: 1480px) { .ticket-workspace.v031 { grid-template-columns: 250px 330px 1fr; } .ticket-ai-panel { grid-column: 1 / -1; min-height: 320px; } }
+@media (max-width: 980px) { .ticket-workspace.v031 { height: auto; grid-template-columns: 1fr; } .status-flow { grid-template-columns: 1fr 1fr; } }

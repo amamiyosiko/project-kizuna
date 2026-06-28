@@ -1,8 +1,8 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "ReplyFlow JP",
-  description: "Amazon JP AI客服系统"
+  title: "Project Kizuna",
+  description: "Amazon JP AI 客服运营平台"
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

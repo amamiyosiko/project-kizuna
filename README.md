@@ -71,3 +71,18 @@ S3_UPLOAD_EXPIRES_SECONDS=900
 ## v0.1.5
 
 新增 KZ-009 回复模板：模板 CRUD、分类筛选、启用/停用、Workspace 快捷套用模板。
+
+## Production Deploy
+
+```bash
+cd /www/wwwroot/project-kizuna.mychisyou.com
+./scripts/deploy-production.sh
+```
+
+## Alembic Baseline
+
+First time after v0.3.0 deploy:
+
+```bash
+docker compose exec -T backend alembic -c alembic.ini stamp head
+```

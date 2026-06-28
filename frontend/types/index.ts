@@ -118,3 +118,18 @@ export type TicketEvent = {
   actor_user_id?: number;
   created_at?: string;
 };
+
+export type TicketStats = {
+  total: number;
+  new: number;
+  open: number;
+  processing: number;
+  waiting_customer: number;
+  waiting_platform: number;
+  resolved: number;
+  closed: number;
+  p1: number;
+  p2: number;
+  high_risk: number;
+  today_created: number;
+};

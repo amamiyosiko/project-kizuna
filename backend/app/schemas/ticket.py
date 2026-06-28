@@ -80,3 +80,18 @@ class TicketEventOut(ORMBase):
     actor_type: str | None = None
     actor_user_id: int | None = None
     created_at: datetime | None = None
+
+
+class TicketStatsOut(BaseModel):
+    total: int = 0
+    new: int = 0
+    open: int = 0
+    processing: int = 0
+    waiting_customer: int = 0
+    waiting_platform: int = 0
+    resolved: int = 0
+    closed: int = 0
+    p1: int = 0
+    p2: int = 0
+    high_risk: int = 0
+    today_created: int = 0
