@@ -157,3 +157,53 @@ class Attachment(Base):
     status = Column(String(30), default="uploaded")
     uploaded_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, server_default=func.now())
+
+
+class Ticket(Base):
+    __tablename__ = "tickets"
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_no = Column(String(40), unique=True, nullable=False, index=True)
+    platform = Column(String(50), default="Amazon")
+    marketplace = Column(String(50), default="JP")
+    store_id = Column(Integer, ForeignKey("stores.id"), index=True)
+    buyer_name = Column(String(150), nullable=False)
+    buyer_id = Column(String(150))
+    order_no = Column(String(150), index=True)
+    asin = Column(String(50), index=True)
+    sku = Column(String(150), index=True)
+    subject = Column(String(255))
+    status = Column(String(40), default="NEW", index=True)
+    priority = Column(String(20), default="P3", index=True)
+    category = Column(String(80), index=True)
+    risk_level = Column(String(30), default="low")
+    language = Column(String(20), default="ja")
+    assigned_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    last_message_at = Column(DateTime, server_default=func.now(), index=True)
+    resolved_at = Column(DateTime)
+    closed_at = Column(DateTime)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class TicketMessage(Base):
+    __tablename__ = "ticket_messages"
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("tickets.id"), nullable=False, index=True)
+    sender_type = Column(String(30), nullable=False)  # CUSTOMER / AGENT / AI / SYSTEM
+    message_type = Column(String(30), default="text")
+    content = Column(Text, nullable=False)
+    attachment_count = Column(Integer, default=0)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), index=True)
+
+
+class TicketEvent(Base):
+    __tablename__ = "ticket_events"
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("tickets.id"), nullable=False, index=True)
+    event_type = Column(String(50), nullable=False)
+    title = Column(String(150), nullable=False)
+    description = Column(Text)
+    actor_type = Column(String(30), default="SYSTEM")
+    actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now(), index=True)

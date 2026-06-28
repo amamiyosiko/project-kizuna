@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from app.api.v1 import ai, attachments, auth, conversations, dashboard, messages, stores, templates
+from app.api.v1 import ai, attachments, auth, conversations, dashboard, messages, stores, templates, tickets
 from app.core.config import settings
 from app.core.security import get_password_hash
 from app.db.base import Base
@@ -88,6 +88,7 @@ app.include_router(messages.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
 app.include_router(attachments.router, prefix="/api/v1")
 app.include_router(templates.router, prefix="/api/v1")
+app.include_router(tickets.router, prefix="/api/v1")
 app.include_router(dashboard.router, prefix="/api/v1")
 
 

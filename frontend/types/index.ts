@@ -71,3 +71,50 @@ export type ReplyTemplate = {
   created_at?: string;
   updated_at?: string;
 };
+
+export type Ticket = {
+  id: number;
+  ticket_no: string;
+  platform?: string;
+  marketplace?: string;
+  store_id?: number;
+  buyer_name: string;
+  buyer_id?: string;
+  order_no?: string;
+  asin?: string;
+  sku?: string;
+  subject?: string;
+  status?: string;
+  priority?: string;
+  category?: string;
+  risk_level?: string;
+  language?: string;
+  assigned_user_id?: number;
+  last_message_at?: string;
+  resolved_at?: string;
+  closed_at?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type TicketMessage = {
+  id: number;
+  ticket_id: number;
+  sender_type: "CUSTOMER" | "AGENT" | "AI" | "SYSTEM" | string;
+  message_type?: string;
+  content: string;
+  attachment_count?: number;
+  created_by?: number;
+  created_at?: string;
+};
+
+export type TicketEvent = {
+  id: number;
+  ticket_id: number;
+  event_type: string;
+  title: string;
+  description?: string;
+  actor_type?: string;
+  actor_user_id?: number;
+  created_at?: string;
+};
