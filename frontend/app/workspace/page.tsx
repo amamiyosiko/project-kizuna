@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { apiFetch } from "@/lib/api";
-import type { Store, Ticket, TicketEvent, TicketMessage, TicketStats } from "@/types";
+import type { Attachment, PresignUploadResponse, Store, Ticket, TicketEvent, TicketMessage, TicketStats } from "@/types";
 
 const statusTabs = [
   { label: "全部", value: "" },
@@ -50,6 +50,17 @@ function senderLabel(sender: string) {
   return sender;
 }
 
+function formatFileSize(size?: number) {
+  if (!size) return "0 KB";
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
+  return `${(size / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function isPreviewImage(att: Attachment) {
+  return !!att.file_url && !!att.content_type && att.content_type.startsWith("image/");
+}
+
 const emptyStats: TicketStats = {
   total: 0,
   new: 0,
@@ -71,6 +82,7 @@ export default function WorkspacePage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [messages, setMessages] = useState<TicketMessage[]>([]);
   const [events, setEvents] = useState<TicketEvent[]>([]);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [stats, setStats] = useState<TicketStats>(emptyStats);
   const [active, setActive] = useState<Ticket | null>(null);
   const [activeStoreId, setActiveStoreId] = useState<number | "">("");
@@ -79,6 +91,7 @@ export default function WorkspacePage() {
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [uploadBusy, setUploadBusy] = useState(false);
   const [agentReply, setAgentReply] = useState("");
   const [customerMessage, setCustomerMessage] = useState("");
   const [form, setForm] = useState({
@@ -131,12 +144,14 @@ export default function WorkspacePage() {
     setActive(ticket);
     setAgentReply("");
     setCustomerMessage("");
-    const [m, e] = await Promise.all([
+    const [m, e, a] = await Promise.all([
       apiFetch<TicketMessage[]>(`/tickets/${ticket.id}/messages`),
       apiFetch<TicketEvent[]>(`/tickets/${ticket.id}/events`),
+      apiFetch<Attachment[]>(`/attachments/tickets/${ticket.id}`),
     ]);
     setMessages(m);
     setEvents(e);
+    setAttachments(a);
   }
 
   async function refreshActive(ticketId?: number) {
@@ -189,6 +204,37 @@ export default function WorkspacePage() {
     }
   }
 
+  async function uploadAttachment(file?: File) {
+    if (!active || !file) return;
+    setUploadBusy(true);
+    try {
+      const contentType = file.type || "application/octet-stream";
+      const presign = await apiFetch<PresignUploadResponse>(`/attachments/tickets/${active.id}/presign`, {
+        method: "POST",
+        body: JSON.stringify({ file_name: file.name, content_type: contentType, file_size: file.size }),
+      });
+      const uploaded = await fetch(presign.upload_url, {
+        method: "PUT",
+        headers: { "Content-Type": contentType },
+        body: file,
+      });
+      if (!uploaded.ok) throw new Error("S3 upload failed");
+      await apiFetch<Attachment>(`/attachments/tickets/${active.id}/confirm`, {
+        method: "POST",
+        body: JSON.stringify({
+          file_name: file.name,
+          content_type: contentType,
+          file_size: file.size,
+          bucket: presign.bucket,
+          object_key: presign.object_key,
+        }),
+      });
+      await refreshActive(active.id);
+    } finally {
+      setUploadBusy(false);
+    }
+  }
+
   const storeCounts = useMemo(() => stores.map(s => ({ ...s, count: tickets.filter(t => t.store_id === s.id).length })), [stores, tickets]);
   const activeStore = active?.store_id ? storeMap.get(active.store_id) : undefined;
 
@@ -198,7 +244,7 @@ export default function WorkspacePage() {
         <aside className="panel ticket-nav">
           <div className="workspace-brand">
             <strong>工作项中心</strong>
-            <span>生产使用版 v0.3.1</span>
+            <span>生产使用版 v0.3.2</span>
           </div>
           <button className="btn full" onClick={() => setShowCreate(true)}>＋ 新建工作项</button>
           <input className="input" placeholder="搜索编号 / 买家 / 订单 / SKU" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") loadTickets(); }} />
@@ -270,6 +316,7 @@ export default function WorkspacePage() {
               <div><span>ASIN</span><strong>{active.asin || "-"}</strong></div>
               <div><span>SKU</span><strong>{active.sku || "-"}</strong></div>
               <div><span>分类</span><strong>{active.category || "-"}</strong></div>
+              <div><span>附件</span><strong>{attachments.length}</strong></div>
             </div>
 
             <div className="status-flow">
@@ -318,6 +365,29 @@ export default function WorkspacePage() {
             </select>
           </div>}
 
+          {active && <div className="attachment-box">
+            <div className="attachment-head">
+              <label>附件</label>
+              <span>{attachments.length} 个文件</span>
+            </div>
+            <label className="upload-drop">
+              <input type="file" disabled={uploadBusy} onChange={e => { uploadAttachment(e.target.files?.[0]); e.currentTarget.value = ""; }} />
+              <strong>{uploadBusy ? "上传中..." : "上传到 S3"}</strong>
+              <small>支持图片、PDF、文本等文件；用于保存买家截图、破损照片、标签图。</small>
+            </label>
+            <div className="attachment-list">
+              {attachments.map(att => <div className="attachment-item" key={att.id}>
+                {isPreviewImage(att) ? <img src={att.file_url} alt={att.file_name} /> : <div className="file-icon">📎</div>}
+                <div>
+                  <strong title={att.file_name}>{att.file_name}</strong>
+                  <span>{att.content_type || "file"} · {formatFileSize(att.file_size)}</span>
+                  {att.file_url && <a href={att.file_url} target="_blank" rel="noreferrer">打开 / 下载</a>}
+                </div>
+              </div>)}
+              {!attachments.length && <p className="muted">暂无附件。</p>}
+            </div>
+          </div>}
+
           {active && <div className="customer-message-box">
             <label>记录买家追加消息</label>
             <textarea className="textarea compact" placeholder="如果客户再次回复，可以先手动记录到时间线。" value={customerMessage} onChange={e => setCustomerMessage(e.target.value)} />
@@ -330,7 +400,7 @@ export default function WorkspacePage() {
             {active && !events.length && <p className="muted">暂无时间轴。</p>}
             {!active && <p className="muted">选择工作项后显示操作记录。</p>}
           </div>
-          <div className="note-box">v0.3.1 只聚焦工作项中心：列表、筛选、详情、消息时间线、状态流转、基础操作日志。</div>
+          <div className="note-box">v0.3.2 增加 S3 附件上传、附件列表、图片预览和下载链接；仍然只围绕工作项中心推进。</div>
         </aside>
 
         {showCreate && <div className="modal-backdrop">

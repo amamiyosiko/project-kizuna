@@ -15,7 +15,7 @@ export default function DashboardPage() {
           <h2>首页</h2>
           <p>Project Kizuna 已进入生产使用阶段。请从工作项中心开始处理客服消息。</p>
         </div>
-        <div className="summary-pill">工作项中心 v0.3.1</div>
+        <div className="summary-pill">工作项中心 v0.3.2</div>
       </div>
 
       <div className="grid grid-4">

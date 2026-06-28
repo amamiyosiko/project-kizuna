@@ -10,6 +10,12 @@ class PresignUploadRequest(BaseModel):
     file_size: int = 0
 
 
+class TicketPresignUploadRequest(BaseModel):
+    file_name: str = Field(min_length=1, max_length=255)
+    content_type: str = "application/octet-stream"
+    file_size: int = 0
+
+
 class PresignUploadResponse(BaseModel):
     upload_url: str
     bucket: str
@@ -28,10 +34,21 @@ class AttachmentConfirmRequest(BaseModel):
     object_key: str
 
 
+class TicketAttachmentConfirmRequest(BaseModel):
+    ticket_message_id: int | None = None
+    file_name: str
+    content_type: str = "application/octet-stream"
+    file_size: int = 0
+    bucket: str
+    object_key: str
+
+
 class AttachmentRead(BaseModel):
     id: int
     conversation_id: int | None = None
+    ticket_id: int | None = None
     message_id: int | None = None
+    ticket_message_id: int | None = None
     store_id: int | None = None
     file_name: str
     content_type: str | None = None
@@ -39,6 +56,8 @@ class AttachmentRead(BaseModel):
     bucket: str
     object_key: str
     status: str | None = None
+    file_url: str | None = None
+    can_preview: bool = False
     created_at: datetime | None = None
 
     class Config:

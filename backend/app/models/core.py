@@ -145,8 +145,10 @@ class ReplyTemplate(Base):
 class Attachment(Base):
     __tablename__ = "attachments"
     id = Column(Integer, primary_key=True, index=True)
-    conversation_id = Column(Integer, ForeignKey("conversations.id"), index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=True, index=True)
+    ticket_id = Column(Integer, ForeignKey("tickets.id"), nullable=True, index=True)
     message_id = Column(Integer, ForeignKey("messages.id"), nullable=True)
+    ticket_message_id = Column(Integer, ForeignKey("ticket_messages.id"), nullable=True)
     store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
     file_name = Column(String(255), nullable=False)
     file_ext = Column(String(30))

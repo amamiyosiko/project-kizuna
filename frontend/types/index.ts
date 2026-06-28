@@ -49,7 +49,9 @@ export type AIReply = {
 export type Attachment = {
   id: number;
   conversation_id?: number;
+  ticket_id?: number;
   message_id?: number;
+  ticket_message_id?: number;
   store_id?: number;
   file_name: string;
   content_type?: string;
@@ -57,7 +59,17 @@ export type Attachment = {
   bucket: string;
   object_key: string;
   status?: string;
+  file_url?: string;
+  can_preview?: boolean;
   created_at?: string;
+};
+
+export type PresignUploadResponse = {
+  upload_url: string;
+  bucket: string;
+  object_key: string;
+  file_url?: string;
+  expires_seconds: number;
 };
 
 export type ReplyTemplate = {
