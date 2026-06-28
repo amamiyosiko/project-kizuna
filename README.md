@@ -86,3 +86,8 @@ First time after v0.3.0 deploy:
 ```bash
 docker compose exec -T backend alembic -c alembic.ini stamp head
 ```
+
+
+## v0.3.3.1
+
+AI 回复助手支持 GPT / Gemini 双模型，并保留备用规则回复。

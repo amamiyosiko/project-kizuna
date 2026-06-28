@@ -94,6 +94,7 @@ export default function WorkspacePage() {
   const [uploadBusy, setUploadBusy] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const [aiTone, setAiTone] = useState("polite");
+  const [aiProvider, setAiProvider] = useState("auto");
   const [aiDraft, setAiDraft] = useState<TicketAIReply | null>(null);
   const [agentReply, setAgentReply] = useState("");
   const [customerMessage, setCustomerMessage] = useState("");
@@ -214,7 +215,7 @@ export default function WorkspacePage() {
     try {
       const generated = await apiFetch<TicketAIReply>(`/ai/tickets/${active.id}/generate-reply`, {
         method: "POST",
-        body: JSON.stringify({ tone: aiTone }),
+        body: JSON.stringify({ tone: aiTone, provider: aiProvider }),
       });
       setAiDraft(generated);
       const e = await apiFetch<TicketEvent[]>(`/tickets/${active.id}/events`);
@@ -272,7 +273,7 @@ export default function WorkspacePage() {
         <aside className="panel ticket-nav">
           <div className="workspace-brand">
             <strong>工作项中心</strong>
-            <span>生产使用版 v0.3.3</span>
+            <span>生产使用版 v0.3.3.1</span>
           </div>
           <button className="btn full" onClick={() => setShowCreate(true)}>＋ 新建工作项</button>
           <input className="input" placeholder="搜索编号 / 买家 / 订单 / SKU" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") loadTickets(); }} />
@@ -385,11 +386,19 @@ export default function WorkspacePage() {
                 <strong>AI 回复助手</strong>
                 <span>根据最新买家消息生成日文回复草稿</span>
               </div>
-              <select className="select" value={aiTone} onChange={e => setAiTone(e.target.value)}>
-                <option value="polite">标准礼貌</option>
-                <option value="apology">加强道歉</option>
-                <option value="short">简短回复</option>
-              </select>
+              <div className="ai-select-stack">
+                <select className="select" value={aiProvider} onChange={e => setAiProvider(e.target.value)}>
+                  <option value="auto">自动</option>
+                  <option value="openai">GPT</option>
+                  <option value="gemini">Gemini</option>
+                  <option value="rule">备用规则</option>
+                </select>
+                <select className="select" value={aiTone} onChange={e => setAiTone(e.target.value)}>
+                  <option value="polite">标准礼貌</option>
+                  <option value="apology">加强道歉</option>
+                  <option value="short">简短回复</option>
+                </select>
+              </div>
             </div>
             <button className="btn full" disabled={aiBusy || !messages.some(m => m.sender_type === "CUSTOMER")} onClick={generateAiReply}>
               {aiBusy ? "AI生成中..." : "生成AI日文回复"}
@@ -397,11 +406,11 @@ export default function WorkspacePage() {
             {!messages.some(m => m.sender_type === "CUSTOMER") && <p className="muted">需要先有买家消息，才能生成回复。</p>}
             {aiDraft && <div className="ai-draft-box">
               <div className="ai-draft-meta">
-                <span>分类：<strong>{aiDraft.category}</strong></span>
+                <span>模型：<strong>{aiDraft.provider === "openai" ? "GPT" : aiDraft.provider === "gemini" ? "Gemini" : "备用"}</strong></span>
                 <span>风险：<strong>{riskLabel[aiDraft.risk_level] || aiDraft.risk_level}</strong></span>
                 <span>可信度：<strong>{aiDraft.confidence_score}%</strong></span>
               </div>
-              <p className="ai-recommendation">{aiDraft.recommended_action || "建议人工确认后回复。"}</p>
+              <p className="ai-recommendation">分类：{aiDraft.category} / {aiDraft.recommended_action || "建议人工确认后回复。"}</p>
               <textarea className="textarea compact ai-draft-text" value={aiDraft.reply_text} onChange={e => setAiDraft({ ...aiDraft, reply_text: e.target.value })} />
               <div className="ai-action-grid">
                 <button className="btn secondary" type="button" onClick={() => setAgentReply(aiDraft.reply_text)}>填入客服回复</button>
@@ -409,6 +418,7 @@ export default function WorkspacePage() {
                 <button className="btn secondary" type="button" onClick={applyAiAnalysis}>应用分类/风险</button>
               </div>
               <small className="ai-source">来源消息：{aiDraft.source_excerpt || "-"}</small>
+              {aiDraft.model && <small className="ai-source">使用模型：{aiDraft.model}{aiDraft.fallback_used ? "（已降级备用规则）" : ""}</small>}
               {aiDraft.reason && <small className="ai-source">判断依据：{aiDraft.reason}</small>}
             </div>}
           </div>}
@@ -462,7 +472,7 @@ export default function WorkspacePage() {
             {active && !events.length && <p className="muted">暂无时间轴。</p>}
             {!active && <p className="muted">选择工作项后显示操作记录。</p>}
           </div>
-          <div className="note-box">v0.3.3 增加 AI 回复助手：先生成日文草稿，不自动发送 Amazon；客服确认后再保存。</div>
+          <div className="note-box">v0.3.3.1 增加 GPT / Gemini 双模型：可自动选择或手动切换，失败时降级备用规则，不自动发送 Amazon。</div>
         </aside>
 
         {showCreate && <div className="modal-backdrop">

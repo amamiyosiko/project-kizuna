@@ -28,6 +28,7 @@ class AIReplyOut(ORMBase):
 class TicketGenerateReplyRequest(BaseModel):
     message_id: int | None = None
     tone: str = "polite"
+    provider: str = "auto"
 
 
 class TicketAIReplyOut(BaseModel):
@@ -41,5 +42,8 @@ class TicketAIReplyOut(BaseModel):
     auto_reply_allowed: bool = False
     reason: str | None = None
     tone: str = "polite"
+    provider: str = "rule"
+    model: str | None = None
+    fallback_used: bool = False
     reply_text: str
     source_excerpt: str | None = None

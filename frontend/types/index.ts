@@ -157,6 +157,9 @@ export type TicketAIReply = {
   auto_reply_allowed: boolean;
   reason?: string;
   tone: string;
+  provider: string;
+  model?: string;
+  fallback_used?: boolean;
   reply_text: string;
   source_excerpt?: string;
 };
