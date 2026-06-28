@@ -24,8 +24,8 @@ export default function ProfilePage() {
         method: "POST",
         body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
       });
-      setMessage("密码已修改，正在进入工作台。");
-      setTimeout(() => router.push("/workspace"), 800);
+      setMessage("密码已修改，正在进入首页。");
+      setTimeout(() => router.push("/dashboard"), 800);
     } catch {
       setMessage("修改失败：请确认旧密码，新密码至少 8 位。");
     }
@@ -42,8 +42,8 @@ export default function ProfilePage() {
         <label>新密码</label>
         <input className="input" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="至少 8 位" />
         {message && <div className="error-box neutral">{message}</div>}
-        <button className="btn login-btn">保存并进入工作台</button>
-        <button className="btn secondary" type="button" onClick={() => router.push("/workspace")}>稍后再改</button>
+        <button className="btn login-btn">保存并进入首页</button>
+        <button className="btn secondary" type="button" onClick={() => router.push("/dashboard")}>稍后再改</button>
       </form>
     </main>
   );

@@ -27,7 +27,7 @@ export default function LoginPage() {
         body: JSON.stringify({ username, password })
       });
       setTokens(data.access_token, data.refresh_token);
-      router.push(data.must_change_password ? "/profile" : "/workspace");
+      router.push(data.must_change_password ? "/profile" : "/dashboard");
     } catch (err) {
       setError("登录失败：请确认账号密码，或后端服务是否已启动。");
     } finally {
