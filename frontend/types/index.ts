@@ -163,3 +163,39 @@ export type TicketAIReply = {
   reply_text: string;
   source_excerpt?: string;
 };
+
+
+export type AmazonStoreStatus = {
+  id: number;
+  store_name: string;
+  store_code: string;
+  marketplace?: string;
+  seller_id?: string;
+  status?: string;
+  seller_id_ready: boolean;
+};
+
+export type AmazonCredentialStatus = {
+  lwa_client_id: boolean;
+  lwa_client_secret: boolean;
+  refresh_token: boolean;
+  marketplace_id: boolean;
+  endpoint_region: string;
+};
+
+export type AmazonStatus = {
+  stage: string;
+  mode: string;
+  auto_sync_enabled: boolean;
+  ready_for_next_stage: boolean;
+  credentials: AmazonCredentialStatus;
+  stores: AmazonStoreStatus[];
+  missing_items: string[];
+  next_step?: string;
+};
+
+export type AmazonManualImportResponse = {
+  success: boolean;
+  ticket: Ticket;
+  message: string;
+};

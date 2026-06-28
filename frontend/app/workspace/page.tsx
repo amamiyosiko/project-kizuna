@@ -273,7 +273,7 @@ export default function WorkspacePage() {
         <aside className="panel ticket-nav">
           <div className="workspace-brand">
             <strong>工作项中心</strong>
-            <span>生产使用版 v0.3.3.1</span>
+            <span>生产使用版 v0.3.4</span>
           </div>
           <button className="btn full" onClick={() => setShowCreate(true)}>＋ 新建工作项</button>
           <input className="input" placeholder="搜索编号 / 买家 / 订单 / SKU" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") loadTickets(); }} />
@@ -472,7 +472,7 @@ export default function WorkspacePage() {
             {active && !events.length && <p className="muted">暂无时间轴。</p>}
             {!active && <p className="muted">选择工作项后显示操作记录。</p>}
           </div>
-          <div className="note-box">v0.3.3.1 增加 GPT / Gemini 双模型：可自动选择或手动切换，失败时降级备用规则，不自动发送 Amazon。</div>
+          <div className="note-box">v0.3.4 保留工作项、附件和 AI 回复能力；新增 Amazon 接入入口与手动导入链路。</div>
         </aside>
 
         {showCreate && <div className="modal-backdrop">

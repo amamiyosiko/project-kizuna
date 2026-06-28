@@ -10,6 +10,7 @@ const navItems = [
   { href: "/knowledge", label: "知识库", icon: "📚" },
   { href: "/customers", label: "客户", icon: "👥" },
   { href: "/stores", label: "店铺", icon: "🏪" },
+  { href: "/amazon", label: "Amazon接入", icon: "🔌" },
   { href: "/templates", label: "回复模板", icon: "💬" },
   { href: "/settings", label: "系统设置", icon: "⚙️" },
 ];
@@ -48,7 +49,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="admin-sidebar-footer">
           <span>生产环境</span>
-          <strong>v0.3.3.1</strong>
+          <strong>v0.3.4</strong>
         </div>
       </aside>
 

@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str | None = None
     S3_UPLOAD_EXPIRES_SECONDS: int = 900
 
+    AMAZON_LWA_CLIENT_ID: str | None = None
+    AMAZON_LWA_CLIENT_SECRET: str | None = None
+    AMAZON_REFRESH_TOKEN: str | None = None
+    AMAZON_MARKETPLACE_ID: str | None = None
+    AMAZON_REGION: str = "jp"
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
