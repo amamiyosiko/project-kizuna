@@ -12,8 +12,8 @@ type LoginResponse = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin123456");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -47,7 +47,6 @@ export default function LoginPage() {
         <input className="input" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="密码" autoComplete="current-password" />
         {error && <div className="error-box">{error}</div>}
         <button className="btn login-btn" disabled={loading}>{loading ? "登录中..." : "登录"}</button>
-        <div className="login-help">默认账号：admin / admin123456</div>
       </form>
     </main>
   );

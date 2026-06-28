@@ -8,7 +8,7 @@ type Me = { id: number; username: string; role: string; status: string; must_cha
 export default function ProfilePage() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
-  const [oldPassword, setOldPassword] = useState("admin123456");
+  const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
 
