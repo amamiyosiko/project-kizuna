@@ -32,3 +32,21 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
   return res.json();
 }
+
+
+export async function apiFetchForm<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = getAccessToken();
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers || {})
+    },
+    cache: "no-store"
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || `API error: ${res.status}`);
+  }
+  return res.json();
+}

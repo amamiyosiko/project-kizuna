@@ -78,3 +78,14 @@ def public_file_url(object_key: str) -> str | None:
     if not settings.S3_BUCKET_NAME:
         return None
     return f"https://{settings.S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{object_key}"
+
+
+def upload_file_bytes(object_key: str, data: bytes, content_type: str) -> None:
+    if not settings.S3_BUCKET_NAME:
+        raise RuntimeError("S3_BUCKET_NAME is not configured")
+    _s3_client().put_object(
+        Bucket=settings.S3_BUCKET_NAME,
+        Key=object_key,
+        Body=data,
+        ContentType=content_type or "application/octet-stream",
+    )

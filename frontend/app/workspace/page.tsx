@@ -2,8 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
-import { apiFetch } from "@/lib/api";
-import type { Attachment, PresignUploadResponse, Store, Ticket, TicketEvent, TicketMessage, TicketStats } from "@/types";
+import { apiFetch, apiFetchForm } from "@/lib/api";
+import type { Attachment, Store, Ticket, TicketEvent, TicketMessage, TicketStats } from "@/types";
 
 const statusTabs = [
   { label: "全部", value: "" },
@@ -208,28 +208,15 @@ export default function WorkspacePage() {
     if (!active || !file) return;
     setUploadBusy(true);
     try {
-      const contentType = file.type || "application/octet-stream";
-      const presign = await apiFetch<PresignUploadResponse>(`/attachments/tickets/${active.id}/presign`, {
+      const formData = new FormData();
+      formData.append("file", file);
+      await apiFetchForm<Attachment>(`/attachments/tickets/${active.id}/upload`, {
         method: "POST",
-        body: JSON.stringify({ file_name: file.name, content_type: contentType, file_size: file.size }),
-      });
-      const uploaded = await fetch(presign.upload_url, {
-        method: "PUT",
-        headers: { "Content-Type": contentType },
-        body: file,
-      });
-      if (!uploaded.ok) throw new Error("S3 upload failed");
-      await apiFetch<Attachment>(`/attachments/tickets/${active.id}/confirm`, {
-        method: "POST",
-        body: JSON.stringify({
-          file_name: file.name,
-          content_type: contentType,
-          file_size: file.size,
-          bucket: presign.bucket,
-          object_key: presign.object_key,
-        }),
+        body: formData,
       });
       await refreshActive(active.id);
+    } catch (err) {
+      alert(err instanceof Error ? `附件上传失败：${err.message}` : "附件上传失败，请稍后重试。");
     } finally {
       setUploadBusy(false);
     }
@@ -244,7 +231,7 @@ export default function WorkspacePage() {
         <aside className="panel ticket-nav">
           <div className="workspace-brand">
             <strong>工作项中心</strong>
-            <span>生产使用版 v0.3.2</span>
+            <span>生产使用版 v0.3.2.1</span>
           </div>
           <button className="btn full" onClick={() => setShowCreate(true)}>＋ 新建工作项</button>
           <input className="input" placeholder="搜索编号 / 买家 / 订单 / SKU" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === "Enter") loadTickets(); }} />
@@ -400,7 +387,7 @@ export default function WorkspacePage() {
             {active && !events.length && <p className="muted">暂无时间轴。</p>}
             {!active && <p className="muted">选择工作项后显示操作记录。</p>}
           </div>
-          <div className="note-box">v0.3.2 增加 S3 附件上传、附件列表、图片预览和下载链接；仍然只围绕工作项中心推进。</div>
+          <div className="note-box">v0.3.2.1 修复附件上传：改为后端直传 S3，避免浏览器直传失败导致不写入数据库。</div>
         </aside>
 
         {showCreate && <div className="modal-backdrop">

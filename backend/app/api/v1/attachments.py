@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -21,6 +21,7 @@ from app.services.storage import (
     create_presigned_put_url,
     guess_content_type,
     public_file_url,
+    upload_file_bytes,
 )
 
 router = APIRouter(prefix="/attachments", tags=["attachments"])
@@ -136,6 +137,58 @@ def presign_ticket_upload(ticket_id: int, payload: TicketPresignUploadRequest, d
         file_url=public_file_url(object_key),
         expires_seconds=settings.S3_UPLOAD_EXPIRES_SECONDS,
     )
+
+
+@router.post("/tickets/{ticket_id}/upload", response_model=AttachmentRead)
+async def upload_ticket_attachment(
+    ticket_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _ensure_s3_configured()
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+    if not ticket:
+        raise HTTPException(status_code=404, detail="ticket not found")
+
+    file_name = Path(file.filename or "attachment").name
+    data = await file.read()
+    if not data:
+        raise HTTPException(status_code=400, detail="empty file")
+
+    content_type = file.content_type or guess_content_type(file_name)
+    if content_type == "application/octet-stream":
+        content_type = guess_content_type(file_name, content_type)
+
+    store = db.query(Store).filter(Store.id == ticket.store_id).first() if ticket.store_id else None
+    store_code = store.store_code if store else "unknown-store"
+    object_key = build_ticket_object_key(
+        store_code=store_code,
+        ticket_id=ticket.id,
+        ticket_no=ticket.ticket_no,
+        file_name=file_name,
+    )
+
+    upload_file_bytes(object_key, data, content_type)
+
+    ext = Path(file_name).suffix.lower().lstrip(".")
+    attachment = Attachment(
+        ticket_id=ticket.id,
+        store_id=ticket.store_id,
+        file_name=file_name,
+        file_ext=ext,
+        content_type=content_type,
+        file_size=len(data),
+        bucket=settings.S3_BUCKET_NAME,
+        object_key=object_key,
+        status="uploaded",
+        uploaded_by=current_user.id,
+    )
+    db.add(attachment)
+    _add_ticket_event(db, ticket.id, "附件已上传", f"{file_name}（{len(data)} bytes）", current_user)
+    db.commit()
+    db.refresh(attachment)
+    return _attachment_out(attachment)
 
 
 @router.post("/tickets/{ticket_id}/confirm", response_model=AttachmentRead)
