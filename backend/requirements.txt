@@ -11,3 +11,4 @@ openai
 boto3
 bcrypt==4.0.1
 alembic
+requests

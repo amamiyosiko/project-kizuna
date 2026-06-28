@@ -181,6 +181,9 @@ export type AmazonCredentialStatus = {
   refresh_token: boolean;
   marketplace_id: boolean;
   endpoint_region: string;
+  endpoint?: string;
+  signing_region?: string;
+  aws_signing_ready?: boolean;
 };
 
 export type AmazonStatus = {
@@ -192,10 +195,38 @@ export type AmazonStatus = {
   stores: AmazonStoreStatus[];
   missing_items: string[];
   next_step?: string;
+  official_limit_note?: string;
 };
 
 export type AmazonManualImportResponse = {
   success: boolean;
   ticket: Ticket;
   message: string;
+};
+
+
+export type AmazonConnectionTestResponse = {
+  success: boolean;
+  message: string;
+  endpoint?: string;
+  marketplace_id?: string;
+  order_count: number;
+  sample_order_ids: string[];
+};
+
+export type AmazonImportOrdersResponse = {
+  success: boolean;
+  fetched_count: number;
+  created_count: number;
+  skipped_count: number;
+  tickets: Ticket[];
+  message: string;
+};
+
+export type AmazonMessagingActionsResponse = {
+  success: boolean;
+  amazon_order_id: string;
+  available_actions_count: number;
+  available_action_titles: string[];
+  raw_keys: string[];
 };

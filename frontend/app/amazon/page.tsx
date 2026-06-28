@@ -3,13 +3,19 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/AppShell";
 import { apiFetch } from "@/lib/api";
-import type { AmazonManualImportResponse, AmazonStatus } from "@/types";
+import type {
+  AmazonConnectionTestResponse,
+  AmazonImportOrdersResponse,
+  AmazonManualImportResponse,
+  AmazonMessagingActionsResponse,
+  AmazonStatus,
+} from "@/types";
 
 const categories = ["配送未到", "配送延迟", "商品破损", "商品不良", "缺件", "错发", "返品希望", "退款咨询", "使用方法", "差评风险", "其他"];
 
 const emptyStatus: AmazonStatus = {
-  stage: "v0.3.4",
-  mode: "readiness",
+  stage: "v0.3.4.1",
+  mode: "production_spapi",
   auto_sync_enabled: false,
   ready_for_next_stage: false,
   credentials: {
@@ -18,6 +24,7 @@ const emptyStatus: AmazonStatus = {
     refresh_token: false,
     marketplace_id: false,
     endpoint_region: "jp",
+    aws_signing_ready: false,
   },
   stores: [],
   missing_items: [],
@@ -32,8 +39,17 @@ export default function AmazonPage() {
   const [status, setStatus] = useState<AmazonStatus>(emptyStatus);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [checkingActions, setCheckingActions] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [testResult, setTestResult] = useState<AmazonConnectionTestResponse | null>(null);
+  const [syncResult, setSyncResult] = useState<AmazonImportOrdersResponse | null>(null);
+  const [actionsResult, setActionsResult] = useState<AmazonMessagingActionsResponse | null>(null);
+  const [syncDays, setSyncDays] = useState(3);
+  const [syncMax, setSyncMax] = useState(20);
+  const [actionOrderId, setActionOrderId] = useState("");
   const [form, setForm] = useState({
     store_id: 0,
     buyer_name: "",
@@ -67,6 +83,71 @@ export default function AmazonPage() {
 
   useEffect(() => { load(); }, []);
 
+  async function testConnection() {
+    setError("");
+    setMessage("");
+    setTestResult(null);
+    setTesting(true);
+    try {
+      const result = await apiFetch<AmazonConnectionTestResponse>("/amazon/test-connection", {
+        method: "POST",
+        body: JSON.stringify({ days: syncDays }),
+      });
+      setTestResult(result);
+      setMessage("SP-API 连接成功。可以继续同步最近订单。");
+    } catch (err) {
+      setError(err instanceof Error ? `SP-API 连接失败：${err.message}` : "SP-API 连接失败。");
+    } finally {
+      setTesting(false);
+    }
+  }
+
+  async function syncOrders() {
+    setError("");
+    setMessage("");
+    setSyncResult(null);
+    if (!form.store_id) {
+      setError("请先选择一个 Amazon 店铺。");
+      return;
+    }
+    setSyncing(true);
+    try {
+      const result = await apiFetch<AmazonImportOrdersResponse>("/amazon/import-orders", {
+        method: "POST",
+        body: JSON.stringify({ store_id: form.store_id, days: syncDays, max_results: syncMax }),
+      });
+      setSyncResult(result);
+      setMessage(`同步完成：拉取 ${result.fetched_count} 单，新建 ${result.created_count} 个工作项，跳过 ${result.skipped_count} 个。`);
+    } catch (err) {
+      setError(err instanceof Error ? `订单同步失败：${err.message}` : "订单同步失败。");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function checkMessagingActions() {
+    setError("");
+    setMessage("");
+    setActionsResult(null);
+    if (!actionOrderId.trim()) {
+      setError("请填写 Amazon 订单号。");
+      return;
+    }
+    setCheckingActions(true);
+    try {
+      const result = await apiFetch<AmazonMessagingActionsResponse>("/amazon/messaging-actions", {
+        method: "POST",
+        body: JSON.stringify({ amazon_order_id: actionOrderId.trim() }),
+      });
+      setActionsResult(result);
+      setMessage(`已查询可发送消息动作：${result.available_actions_count} 个。`);
+    } catch (err) {
+      setError(err instanceof Error ? `查询消息动作失败：${err.message}` : "查询消息动作失败。");
+    } finally {
+      setCheckingActions(false);
+    }
+  }
+
   async function submitManualImport(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -98,10 +179,10 @@ export default function AmazonPage() {
     <AppShell>
       <div className="page-header">
         <div>
-          <h2>Amazon 接入</h2>
-          <p>v0.3.4 先完成 SP-API 准备和手动导入链路；真实自动同步在凭证齐全后继续接入。</p>
+          <h2>Amazon 正式接入</h2>
+          <p>v0.3.4.1 接入真实 SP-API：先打通连接、订单同步和消息动作检查；不自动发送买家消息。</p>
         </div>
-        <div className="summary-pill">{status.ready_for_next_stage ? "凭证准备完成" : "接入准备中"}</div>
+        <div className="summary-pill">{status.ready_for_next_stage ? "正式接入准备完成" : "接入准备中"}</div>
       </div>
 
       <div className="amazon-grid">
@@ -118,10 +199,13 @@ export default function AmazonPage() {
             <BoolBadge ok={status.credentials.lwa_client_secret} label="LWA Secret" />
             <BoolBadge ok={status.credentials.refresh_token} label="Refresh Token" />
             <BoolBadge ok={status.credentials.marketplace_id} label="Marketplace ID" />
+            <BoolBadge ok={!!status.credentials.aws_signing_ready} label="AWS签名" />
           </div>
           <div className="readiness-box">
-            <strong>{status.ready_for_next_stage ? "可以进入下一阶段" : "还不能自动同步"}</strong>
+            <strong>{status.ready_for_next_stage ? "可以正式调用 SP-API" : "还不能正式调用 SP-API"}</strong>
             <p>{status.next_step || "请补齐配置。"}</p>
+            <p className="muted">Endpoint：{status.credentials.endpoint || "-"} / Signing：{status.credentials.signing_region || "-"}</p>
+            {status.official_limit_note && <p className="muted">注意：{status.official_limit_note}</p>}
             {!status.ready_for_next_stage && status.missing_items.length > 0 && (
               <ul>
                 {status.missing_items.map(item => <li key={item}>{item}</li>)}
@@ -132,7 +216,7 @@ export default function AmazonPage() {
 
         <section className="card amazon-status-card">
           <h3>Amazon JP 店铺准备</h3>
-          <p>至少需要一个 Amazon 店铺填写 Seller ID，后续同步才知道消息属于哪个店铺。</p>
+          <p>至少需要一个 Amazon 店铺填写 Seller ID，后续同步才知道订单属于哪个店铺。</p>
           <table className="compact-table">
             <thead><tr><th>店铺</th><th>编码</th><th>Seller ID</th><th>状态</th></tr></thead>
             <tbody>
@@ -153,10 +237,61 @@ export default function AmazonPage() {
       <section className="card manual-import-card">
         <div className="section-title-row">
           <div>
-            <h3>手动导入 Amazon 买家消息</h3>
-            <p>在自动同步完成前，可以先把真实买家消息粘贴进来，验证工作项、附件和 AI 回复流程。</p>
+            <h3>正式 SP-API 操作</h3>
+            <p>先测试连接，再同步最近订单生成工作项。买家消息仍保持人工确认，不自动发送。</p>
           </div>
           <button className="btn secondary" type="button" onClick={() => router.push("/workspace")}>去工作项中心</button>
+        </div>
+        <div className="amazon-import-form">
+          <div className="form-row three">
+            <label>同步店铺
+              <select className="select" value={form.store_id} onChange={e => setForm({ ...form, store_id: Number(e.target.value) })}>
+                <option value={0}>请选择店铺</option>
+                {status.stores.map(s => <option key={s.id} value={s.id}>{s.store_code} - {s.store_name}</option>)}
+              </select>
+            </label>
+            <label>最近天数
+              <input className="input" type="number" min={1} max={30} value={syncDays} onChange={e => setSyncDays(Number(e.target.value || 3))} />
+            </label>
+            <label>最多订单数
+              <input className="input" type="number" min={1} max={100} value={syncMax} onChange={e => setSyncMax(Number(e.target.value || 20))} />
+            </label>
+          </div>
+          <div className="button-row">
+            <button className="btn secondary" type="button" disabled={testing} onClick={testConnection}>{testing ? "连接测试中..." : "测试 SP-API 连接"}</button>
+            <button className="btn" type="button" disabled={syncing} onClick={syncOrders}>{syncing ? "同步中..." : "同步最近订单为工作项"}</button>
+          </div>
+          {testResult && <div className="error-box neutral">{testResult.message} 最近样本订单：{testResult.sample_order_ids.join(" / ") || "无"}</div>}
+          {syncResult && <div className="error-box neutral">拉取 {syncResult.fetched_count} 单，新建 {syncResult.created_count} 个，跳过 {syncResult.skipped_count} 个。</div>}
+        </div>
+      </section>
+
+      <section className="card manual-import-card">
+        <div className="section-title-row">
+          <div>
+            <h3>买家消息动作检查</h3>
+            <p>输入 Amazon 订单号，查询该订单当前允许发送哪些买家消息类型。此功能只查询，不发送。</p>
+          </div>
+        </div>
+        <div className="amazon-import-form">
+          <div className="form-row two">
+            <label>Amazon 订单号
+              <input className="input" value={actionOrderId} onChange={e => setActionOrderId(e.target.value)} placeholder="例如 123-1234567-1234567" />
+            </label>
+            <label>操作
+              <button className="btn secondary" type="button" disabled={checkingActions} onClick={checkMessagingActions}>{checkingActions ? "查询中..." : "查询可发送消息类型"}</button>
+            </label>
+          </div>
+          {actionsResult && <div className="error-box neutral">可用动作 {actionsResult.available_actions_count} 个：{actionsResult.available_action_titles.join(" / ") || "Amazon 未返回标题"}</div>}
+        </div>
+      </section>
+
+      <section className="card manual-import-card">
+        <div className="section-title-row">
+          <div>
+            <h3>手动导入 Amazon 买家消息</h3>
+            <p>如果 Amazon 不开放站内信收件箱自动拉取，仍可把真实买家消息粘贴进来，进入同一套工作项、附件和 AI 回复流程。</p>
+          </div>
         </div>
         <form className="amazon-import-form" onSubmit={submitManualImport}>
           <div className="form-row two">
