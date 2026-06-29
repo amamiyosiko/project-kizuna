@@ -70,7 +70,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="admin-sidebar-footer">
           <span>{profile?.role_name || "生产环境"}</span>
-          <strong>v0.3.6</strong>
+          <strong>v0.3.7</strong>
         </div>
       </aside>
 

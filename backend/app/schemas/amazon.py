@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 from app.schemas.ticket import TicketOut
@@ -27,15 +29,15 @@ class AmazonCredentialStatus(BaseModel):
 
 
 class AmazonStatusOut(BaseModel):
-    stage: str = "v0.3.6"
-    mode: str = "production_spapi"
+    stage: str = "v0.3.7"
+    mode: str = "production_spapi_sync"
     auto_sync_enabled: bool = False
     ready_for_next_stage: bool = False
     credentials: AmazonCredentialStatus
     stores: list[AmazonStoreStatus] = []
     missing_items: list[str] = []
     next_step: str | None = None
-    official_limit_note: str = "SP-API Messaging API 主要用于发送买家消息和查询订单可用消息动作；买家站内信收件箱不作为本阶段自动拉取对象。"
+    official_limit_note: str = "v0.3.7 强化订单同步与工作项生成；买家站内信收件箱仍不作为本阶段自动拉取对象。"
 
 
 class AmazonManualImportRequest(BaseModel):
@@ -75,15 +77,42 @@ class AmazonImportOrdersRequest(BaseModel):
     store_id: int
     days: int = Field(default=3, ge=1, le=30)
     max_results: int = Field(default=20, ge=1, le=100)
+    page_limit: int = Field(default=1, ge=1, le=10)
+
+
+class AmazonSyncRunOut(BaseModel):
+    id: int
+    store_id: int | None = None
+    status: str
+    sync_type: str | None = None
+    requested_days: int | None = None
+    requested_max_results: int | None = None
+    requested_page_limit: int | None = None
+    fetched_count: int | None = 0
+    order_created_count: int | None = 0
+    order_updated_count: int | None = 0
+    ticket_created_count: int | None = 0
+    ticket_updated_count: int | None = 0
+    skipped_count: int | None = 0
+    error_message: str | None = None
+    started_by: int | None = None
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+    model_config = {"from_attributes": True}
 
 
 class AmazonImportOrdersResponse(BaseModel):
     success: bool = True
     fetched_count: int = 0
-    created_count: int = 0
+    order_created_count: int = 0
+    order_updated_count: int = 0
+    ticket_created_count: int = 0
+    ticket_updated_count: int = 0
     skipped_count: int = 0
     tickets: list[TicketOut] = []
-    message: str = "Amazon 订单已同步为工作项"
+    sync_run: AmazonSyncRunOut | None = None
+    message: str = "Amazon 订单同步完成"
 
 
 class AmazonMessagingActionsRequest(BaseModel):

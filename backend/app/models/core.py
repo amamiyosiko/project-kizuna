@@ -63,6 +63,29 @@ class AuditLog(Base):
     created_at = Column(DateTime, server_default=func.now(), index=True)
 
 
+
+
+class AmazonSyncRun(Base):
+    __tablename__ = "amazon_sync_runs"
+    id = Column(Integer, primary_key=True, index=True)
+    store_id = Column(Integer, ForeignKey("stores.id"), nullable=True, index=True)
+    status = Column(String(30), default="running", index=True)
+    sync_type = Column(String(50), default="orders")
+    requested_days = Column(Integer, default=3)
+    requested_max_results = Column(Integer, default=20)
+    requested_page_limit = Column(Integer, default=1)
+    fetched_count = Column(Integer, default=0)
+    order_created_count = Column(Integer, default=0)
+    order_updated_count = Column(Integer, default=0)
+    ticket_created_count = Column(Integer, default=0)
+    ticket_updated_count = Column(Integer, default=0)
+    skipped_count = Column(Integer, default=0)
+    error_message = Column(Text)
+    started_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    started_at = Column(DateTime, server_default=func.now(), index=True)
+    finished_at = Column(DateTime)
+
+
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)

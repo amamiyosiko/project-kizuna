@@ -9,13 +9,14 @@ import type {
   AmazonManualImportResponse,
   AmazonMessagingActionsResponse,
   AmazonStatus,
+  AmazonSyncRun,
 } from "@/types";
 
 const categories = ["配送未到", "配送延迟", "商品破损", "商品不良", "缺件", "错发", "返品希望", "退款咨询", "使用方法", "差评风险", "其他"];
 
 const emptyStatus: AmazonStatus = {
-  stage: "v0.3.6",
-  mode: "production_spapi",
+  stage: "v0.3.7",
+  mode: "production_spapi_sync",
   auto_sync_enabled: false,
   ready_for_next_stage: false,
   credentials: {
@@ -34,9 +35,17 @@ function BoolBadge({ ok, label }: { ok: boolean; label: string }) {
   return <span className={`badge ${ok ? "success" : "muted-badge"}`}>{label}：{ok ? "已配置" : "未配置"}</span>;
 }
 
+function formatDate(value?: string) {
+  if (!value) return "-";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString("zh-CN", { hour12: false });
+}
+
 export default function AmazonPage() {
   const router = useRouter();
   const [status, setStatus] = useState<AmazonStatus>(emptyStatus);
+  const [syncRuns, setSyncRuns] = useState<AmazonSyncRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -49,6 +58,7 @@ export default function AmazonPage() {
   const [actionsResult, setActionsResult] = useState<AmazonMessagingActionsResponse | null>(null);
   const [syncDays, setSyncDays] = useState(3);
   const [syncMax, setSyncMax] = useState(20);
+  const [pageLimit, setPageLimit] = useState(2);
   const [actionOrderId, setActionOrderId] = useState("");
   const [form, setForm] = useState({
     store_id: 0,
@@ -69,8 +79,12 @@ export default function AmazonPage() {
     setError("");
     try {
       await apiFetch("/auth/me");
-      const data = await apiFetch<AmazonStatus>("/amazon/status");
+      const [data, runs] = await Promise.all([
+        apiFetch<AmazonStatus>("/amazon/status"),
+        apiFetch<AmazonSyncRun[]>("/amazon/sync-runs?limit=10"),
+      ]);
       setStatus(data);
+      setSyncRuns(runs);
       if (!form.store_id && data.stores[0]) {
         setForm(v => ({ ...v, store_id: data.stores[0].id }));
       }
@@ -114,12 +128,14 @@ export default function AmazonPage() {
     try {
       const result = await apiFetch<AmazonImportOrdersResponse>("/amazon/import-orders", {
         method: "POST",
-        body: JSON.stringify({ store_id: form.store_id, days: syncDays, max_results: syncMax }),
+        body: JSON.stringify({ store_id: form.store_id, days: syncDays, max_results: syncMax, page_limit: pageLimit }),
       });
       setSyncResult(result);
-      setMessage(`同步完成：拉取 ${result.fetched_count} 单，新建 ${result.created_count} 个工作项，跳过 ${result.skipped_count} 个。`);
+      setMessage(`同步完成：拉取 ${result.fetched_count} 单，订单新增 ${result.order_created_count} / 更新 ${result.order_updated_count}，工作项新增 ${result.ticket_created_count} / 更新 ${result.ticket_updated_count}，跳过 ${result.skipped_count}。`);
+      await load();
     } catch (err) {
       setError(err instanceof Error ? `订单同步失败：${err.message}` : "订单同步失败。");
+      try { await load(); } catch {}
     } finally {
       setSyncing(false);
     }
@@ -180,7 +196,7 @@ export default function AmazonPage() {
       <div className="page-header">
         <div>
           <h2>Amazon 正式接入</h2>
-          <p>v0.3.6 细化权限和正式配置流程：密钥在配置中心填写，店铺资料在店铺管理填写。</p>
+          <p>v0.3.7 增强实际同步流程：分页拉取订单、写入订单表、创建/更新工作项，并记录同步任务。</p>
         </div>
         <div className="summary-pill">{status.ready_for_next_stage ? "正式接入准备完成" : "接入准备中"}</div>
       </div>
@@ -216,7 +232,7 @@ export default function AmazonPage() {
 
         <section className="card amazon-status-card">
           <h3>Amazon JP 店铺准备</h3>
-          <p>至少需要一个 Amazon 店铺填写 Seller ID，后续同步才知道订单属于哪个店铺。</p>
+          <p>至少需要一个 Amazon 店铺填写 Seller ID，并开启同步。</p>
           <table className="compact-table">
             <thead><tr><th>店铺</th><th>编码</th><th>Seller ID</th><th>同步</th><th>状态</th></tr></thead>
             <tbody>
@@ -235,11 +251,74 @@ export default function AmazonPage() {
         </section>
       </div>
 
+      <section className="card manual-import-card">
+        <div className="section-title-row">
+          <div>
+            <h3>正式 SP-API 同步</h3>
+            <p>先测试连接，再按店铺同步最近订单。同步会写入订单表，并自动创建或更新工作项。</p>
+          </div>
+          <button className="btn secondary" type="button" onClick={() => router.push("/workspace")}>去工作项中心</button>
+        </div>
+        <div className="amazon-import-form">
+          <div className="form-row four">
+            <label>同步店铺
+              <select className="select" value={form.store_id} onChange={e => setForm({ ...form, store_id: Number(e.target.value) })}>
+                <option value={0}>请选择店铺</option>
+                {status.stores.map(s => <option key={s.id} value={s.id}>{s.store_code} - {s.store_name}</option>)}
+              </select>
+            </label>
+            <label>最近天数
+              <input className="input" type="number" min={1} max={30} value={syncDays} onChange={e => setSyncDays(Number(e.target.value || 3))} />
+            </label>
+            <label>每页订单数
+              <input className="input" type="number" min={1} max={100} value={syncMax} onChange={e => setSyncMax(Number(e.target.value || 20))} />
+            </label>
+            <label>最多页数
+              <input className="input" type="number" min={1} max={10} value={pageLimit} onChange={e => setPageLimit(Number(e.target.value || 1))} />
+            </label>
+          </div>
+          <div className="button-row">
+            <button className="btn secondary" type="button" disabled={testing} onClick={testConnection}>{testing ? "连接测试中..." : "测试 SP-API 连接"}</button>
+            <button className="btn" type="button" disabled={syncing} onClick={syncOrders}>{syncing ? "同步中..." : "同步最近订单"}</button>
+          </div>
+          {testResult && <div className="error-box neutral">{testResult.message} 最近样本订单：{testResult.sample_order_ids.join(" / ") || "无"}</div>}
+          {syncResult && <div className="error-box neutral">拉取 {syncResult.fetched_count} 单；订单新增 {syncResult.order_created_count}、更新 {syncResult.order_updated_count}；工作项新增 {syncResult.ticket_created_count}、更新 {syncResult.ticket_updated_count}；跳过 {syncResult.skipped_count}。</div>}
+        </div>
+      </section>
+
+      <section className="card manual-import-card">
+        <div className="section-title-row">
+          <div>
+            <h3>同步任务记录</h3>
+            <p>每次同步都会留下记录，方便确认成功、失败和数量。</p>
+          </div>
+          <button className="btn secondary" type="button" onClick={load}>刷新记录</button>
+        </div>
+        <table className="compact-table">
+          <thead><tr><th>时间</th><th>状态</th><th>店铺ID</th><th>拉取</th><th>订单新增/更新</th><th>工作项新增/更新</th><th>跳过</th><th>错误</th></tr></thead>
+          <tbody>
+            {syncRuns.map(run => (
+              <tr key={run.id}>
+                <td>{formatDate(run.started_at)}</td>
+                <td><span className={`badge ${run.status === "success" ? "success" : run.status === "failed" ? "danger" : "muted-badge"}`}>{run.status}</span></td>
+                <td>{run.store_id || "-"}</td>
+                <td>{run.fetched_count || 0}</td>
+                <td>{run.order_created_count || 0} / {run.order_updated_count || 0}</td>
+                <td>{run.ticket_created_count || 0} / {run.ticket_updated_count || 0}</td>
+                <td>{run.skipped_count || 0}</td>
+                <td>{run.error_message ? <span className="muted">{run.error_message.slice(0, 80)}</span> : "-"}</td>
+              </tr>
+            ))}
+            {syncRuns.length === 0 && <tr><td colSpan={8} className="empty-table">暂无同步记录。</td></tr>}
+          </tbody>
+        </table>
+      </section>
+
       <section className="card amazon-status-card">
         <div className="section-title-row">
           <div>
             <h3>正式配置入口</h3>
-            <p>敏感密钥由超级管理员在配置中心维护；Seller ID 和同步开关在店铺管理维护。普通客服看不到这些入口。</p>
+            <p>敏感密钥由超级管理员在配置中心维护；Seller ID 和同步开关在店铺管理维护。</p>
           </div>
         </div>
         <div className="permission-hint-grid">
@@ -258,39 +337,6 @@ export default function AmazonPage() {
             <p>只有拥有 amazon.sync 的账号可以同步订单；只有配置权限账号可以维护密钥。</p>
             <button className="btn secondary" type="button" onClick={() => router.push("/settings")}>查看角色权限</button>
           </div>
-        </div>
-      </section>
-
-
-      <section className="card manual-import-card">
-        <div className="section-title-row">
-          <div>
-            <h3>正式 SP-API 操作</h3>
-            <p>先测试连接，再同步最近订单生成工作项。买家消息仍保持人工确认，不自动发送。</p>
-          </div>
-          <button className="btn secondary" type="button" onClick={() => router.push("/workspace")}>去工作项中心</button>
-        </div>
-        <div className="amazon-import-form">
-          <div className="form-row three">
-            <label>同步店铺
-              <select className="select" value={form.store_id} onChange={e => setForm({ ...form, store_id: Number(e.target.value) })}>
-                <option value={0}>请选择店铺</option>
-                {status.stores.map(s => <option key={s.id} value={s.id}>{s.store_code} - {s.store_name}</option>)}
-              </select>
-            </label>
-            <label>最近天数
-              <input className="input" type="number" min={1} max={30} value={syncDays} onChange={e => setSyncDays(Number(e.target.value || 3))} />
-            </label>
-            <label>最多订单数
-              <input className="input" type="number" min={1} max={100} value={syncMax} onChange={e => setSyncMax(Number(e.target.value || 20))} />
-            </label>
-          </div>
-          <div className="button-row">
-            <button className="btn secondary" type="button" disabled={testing} onClick={testConnection}>{testing ? "连接测试中..." : "测试 SP-API 连接"}</button>
-            <button className="btn" type="button" disabled={syncing} onClick={syncOrders}>{syncing ? "同步中..." : "同步最近订单为工作项"}</button>
-          </div>
-          {testResult && <div className="error-box neutral">{testResult.message} 最近样本订单：{testResult.sample_order_ids.join(" / ") || "无"}</div>}
-          {syncResult && <div className="error-box neutral">拉取 {syncResult.fetched_count} 单，新建 {syncResult.created_count} 个，跳过 {syncResult.skipped_count} 个。</div>}
         </div>
       </section>
 

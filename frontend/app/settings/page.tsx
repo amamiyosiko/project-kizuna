@@ -196,7 +196,7 @@ export default function SettingsPage() {
       <div className="page-header">
         <div>
           <h2>系统设置</h2>
-          <p>v0.3.6 细化权限控制、配置中心和正式接入流程。</p>
+          <p>v0.3.7 细化权限控制、配置中心和正式接入流程。</p>
         </div>
         <div className="summary-pill">当前角色：{me?.role_name || me?.role || "-"}</div>
       </div>

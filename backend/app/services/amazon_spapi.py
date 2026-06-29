@@ -119,7 +119,7 @@ def call_spapi(
     data = json.dumps(body, ensure_ascii=False).encode("utf-8") if body is not None else None
     headers = {
         "host": urlparse(endpoint).netloc,
-        "user-agent": "ProjectKizuna/0.3.5 (Language=Python/3.12)",
+        "user-agent": "ProjectKizuna/0.3.7 (Language=Python/3.12)",
         "x-amz-access-token": token,
         "accept": "application/json",
     }
@@ -161,6 +161,56 @@ def get_recent_orders(days: int = 3, max_results: int = 20) -> dict[str, Any]:
             "MaxResultsPerPage": max_results,
         },
     )
+
+
+def extract_orders(data: dict[str, Any]) -> list[dict[str, Any]]:
+    payload = data.get("payload") if isinstance(data, dict) else {}
+    if isinstance(payload, dict) and isinstance(payload.get("Orders"), list):
+        return payload.get("Orders") or []
+    if isinstance(data, dict) and isinstance(data.get("Orders"), list):
+        return data.get("Orders") or []
+    return []
+
+
+def extract_next_token(data: dict[str, Any]) -> str | None:
+    payload = data.get("payload") if isinstance(data, dict) else {}
+    token = None
+    if isinstance(payload, dict):
+        token = payload.get("NextToken") or payload.get("nextToken")
+    if not token and isinstance(data, dict):
+        token = data.get("NextToken") or data.get("nextToken")
+    return str(token) if token else None
+
+
+def get_recent_orders_pages(days: int = 3, max_results: int = 20, page_limit: int = 1) -> tuple[list[dict[str, Any]], int]:
+    """Fetch recent orders with limited pagination.
+
+    Returns a tuple of (orders, pages_fetched). The page limit is intentionally
+    capped to keep production sync predictable while we are still in v0.3.x.
+    """
+    days = min(max(days, 1), 30)
+    max_results = min(max(max_results, 1), 100)
+    page_limit = min(max(page_limit, 1), 10)
+    created_after = (datetime.now(timezone.utc) - timedelta(days=days)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    orders: list[dict[str, Any]] = []
+    next_token: str | None = None
+    pages = 0
+    for _ in range(page_limit):
+        if next_token:
+            params = {"NextToken": next_token}
+        else:
+            params = {
+                "MarketplaceIds": marketplace_id(),
+                "CreatedAfter": created_after,
+                "MaxResultsPerPage": max_results,
+            }
+        data = call_spapi("GET", "/orders/v0/orders", params=params)
+        pages += 1
+        orders.extend(extract_orders(data))
+        next_token = extract_next_token(data)
+        if not next_token:
+            break
+    return orders, pages
 
 
 def get_messaging_actions_for_order(amazon_order_id: str) -> dict[str, Any]:

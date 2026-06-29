@@ -340,6 +340,7 @@ th { color: #6b7280; font-weight: 600; }
 }
 .form-row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .form-row.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.form-row.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .amazon-import-form label {
   display: flex;
   flex-direction: column;
@@ -350,7 +351,8 @@ th { color: #6b7280; font-weight: 600; }
 @media (max-width: 980px) {
   .amazon-grid,
   .form-row.two,
-  .form-row.three { grid-template-columns: 1fr; }
+  .form-row.three,
+  .form-row.four { grid-template-columns: 1fr; }
 }
 
 /* v0.3.5 RBAC + configuration center */
@@ -524,3 +526,5 @@ th { color: #6b7280; font-weight: 600; }
 @media (max-width: 980px) {
   .permission-hint-grid { grid-template-columns: 1fr; }
 }
+
+.badge.danger { background: #fee2e2; color: #991b1b; border-color: #fecaca; }

@@ -218,12 +218,36 @@ export type AmazonConnectionTestResponse = {
   sample_order_ids: string[];
 };
 
+export type AmazonSyncRun = {
+  id: number;
+  store_id?: number;
+  status: string;
+  sync_type?: string;
+  requested_days?: number;
+  requested_max_results?: number;
+  requested_page_limit?: number;
+  fetched_count?: number;
+  order_created_count?: number;
+  order_updated_count?: number;
+  ticket_created_count?: number;
+  ticket_updated_count?: number;
+  skipped_count?: number;
+  error_message?: string;
+  started_by?: number;
+  started_at?: string;
+  finished_at?: string;
+};
+
 export type AmazonImportOrdersResponse = {
   success: boolean;
   fetched_count: number;
-  created_count: number;
+  order_created_count: number;
+  order_updated_count: number;
+  ticket_created_count: number;
+  ticket_updated_count: number;
   skipped_count: number;
   tickets: Ticket[];
+  sync_run?: AmazonSyncRun;
   message: string;
 };
 
