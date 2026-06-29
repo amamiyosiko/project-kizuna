@@ -6,6 +6,7 @@ from app.ai.providers import AIContext, generate_ai_customer_reply
 from app.ai.reply_generator import generate_rule_based_reply
 from app.core.config import settings
 from app.core.deps import get_current_user
+from app.services.authz import require_permission
 from app.db.session import get_db
 from app.models import AIReply, Message, Ticket, TicketEvent, TicketMessage, User
 from app.schemas.ai_reply import (
@@ -38,12 +39,12 @@ def _add_ticket_event(
 
 
 @router.post("/classify")
-def classify_text(content: str):
+def classify_text(content: str, current_user: User = Depends(require_permission("ai.use"))):
     return simple_classify(content)
 
 
 @router.post("/generate-reply", response_model=AIReplyOut)
-def generate_reply(payload: GenerateReplyRequest, db: Session = Depends(get_db)):
+def generate_reply(payload: GenerateReplyRequest, db: Session = Depends(get_db), current_user: User = Depends(require_permission("ai.use"))):
     message = None
     if payload.message_id:
         message = db.query(Message).filter(Message.id == payload.message_id).first()
@@ -71,7 +72,7 @@ def generate_reply(payload: GenerateReplyRequest, db: Session = Depends(get_db))
 
 
 @router.post("/approve-reply/{reply_id}", response_model=AIReplyOut)
-def approve_reply(reply_id: int, payload: ApproveReplyRequest, db: Session = Depends(get_db)):
+def approve_reply(reply_id: int, payload: ApproveReplyRequest, db: Session = Depends(get_db), current_user: User = Depends(require_permission("ai.use"))):
     reply = db.query(AIReply).filter(AIReply.id == reply_id).first()
     if not reply:
         raise HTTPException(status_code=404, detail="reply not found")
@@ -87,7 +88,7 @@ def generate_ticket_reply(
     ticket_id: int,
     payload: TicketGenerateReplyRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("ai.use")),
 ):
     """Generate a Japanese draft reply for a work item.
 

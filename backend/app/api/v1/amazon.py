@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.v1.tickets import VALID_PRIORITY, VALID_RISK, add_event, make_ticket_no
 from app.core.config import settings
 from app.core.deps import get_current_user, get_db
+from app.services.authz import require_permission
 from app.models import Store, Ticket, TicketMessage, User
 from app.schemas.amazon import (
     AmazonConnectionTestRequest,
@@ -61,7 +62,7 @@ def _orders_from_response(data: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 @router.get("/status", response_model=AmazonStatusOut)
-def amazon_status(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def amazon_status(db: Session = Depends(get_db), current_user: User = Depends(require_permission("amazon.sync"))):
     stores = _amazon_stores(db)
     store_statuses = [
         AmazonStoreStatus(
@@ -69,7 +70,9 @@ def amazon_status(db: Session = Depends(get_db), current_user: User = Depends(ge
             store_name=s.store_name,
             store_code=s.store_code,
             marketplace=s.marketplace,
+            marketplace_id=s.marketplace_id,
             seller_id=s.seller_id,
+            amazon_sync_enabled=bool(s.amazon_sync_enabled),
             status=s.status,
             seller_id_ready=bool((s.seller_id or "").strip()),
         )
@@ -87,8 +90,8 @@ def amazon_status(db: Session = Depends(get_db), current_user: User = Depends(ge
         missing.append("AMAZON_MARKETPLACE_ID")
     if not credentials.aws_signing_ready:
         missing.append("AWS 签名凭证 / EC2 Role")
-    if not any(s.seller_id_ready for s in store_statuses):
-        missing.append("至少一个 Amazon 店铺需要 Seller ID")
+    if not any(s.seller_id_ready and s.amazon_sync_enabled for s in store_statuses):
+        missing.append("至少一个 Amazon 店铺需要 Seller ID，并开启 Amazon 同步")
 
     ready = len(missing) == 0
     return AmazonStatusOut(
@@ -109,7 +112,7 @@ def amazon_status(db: Session = Depends(get_db), current_user: User = Depends(ge
 def test_amazon_connection(
     payload: AmazonConnectionTestRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("amazon.sync")),
 ):
     try:
         data = get_recent_orders(days=payload.days, max_results=1)
@@ -131,7 +134,7 @@ def test_amazon_connection(
 def import_recent_orders(
     payload: AmazonImportOrdersRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("amazon.sync")),
 ):
     store = db.query(Store).filter(Store.id == payload.store_id, Store.platform == "Amazon").first()
     if not store:
@@ -217,7 +220,7 @@ def import_recent_orders(
 def check_messaging_actions(
     payload: AmazonMessagingActionsRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("amazon.sync")),
 ):
     amazon_order_id = payload.amazon_order_id.strip()
     if not amazon_order_id:
@@ -248,7 +251,7 @@ def check_messaging_actions(
 def manual_import_amazon_message(
     payload: AmazonManualImportRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("workitem.create")),
 ):
     store = db.query(Store).filter(Store.id == payload.store_id, Store.platform == "Amazon").first()
     if not store:

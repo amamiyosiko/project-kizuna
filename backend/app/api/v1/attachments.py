@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import get_current_user, get_db
+from app.services.authz import require_permission
 from app.models import Attachment, Conversation, Store, Ticket, TicketEvent, TicketMessage, User
 from app.schemas.attachment import (
     AttachmentConfirmRequest,
@@ -69,7 +70,7 @@ def _add_ticket_event(db: Session, ticket_id: int, title: str, description: str,
 
 
 @router.post("/presign", response_model=PresignUploadResponse)
-def presign_upload(payload: PresignUploadRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def presign_upload(payload: PresignUploadRequest, db: Session = Depends(get_db), current_user: User = Depends(require_permission("attachment.upload"))):
     _ensure_s3_configured()
     conversation = db.query(Conversation).filter(Conversation.id == payload.conversation_id).first()
     if not conversation:
@@ -89,7 +90,7 @@ def presign_upload(payload: PresignUploadRequest, db: Session = Depends(get_db),
 
 
 @router.post("/confirm", response_model=AttachmentRead)
-def confirm_upload(payload: AttachmentConfirmRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def confirm_upload(payload: AttachmentConfirmRequest, db: Session = Depends(get_db), current_user: User = Depends(require_permission("attachment.upload"))):
     conversation = db.query(Conversation).filter(Conversation.id == payload.conversation_id).first()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
@@ -114,13 +115,13 @@ def confirm_upload(payload: AttachmentConfirmRequest, db: Session = Depends(get_
 
 
 @router.get("/conversation/{conversation_id}", response_model=list[AttachmentRead])
-def list_conversation_attachments(conversation_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_conversation_attachments(conversation_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_permission("workitem.view"))):
     rows = db.query(Attachment).filter(Attachment.conversation_id == conversation_id).order_by(Attachment.id.desc()).all()
     return [_attachment_out(row) for row in rows]
 
 
 @router.post("/tickets/{ticket_id}/presign", response_model=PresignUploadResponse)
-def presign_ticket_upload(ticket_id: int, payload: TicketPresignUploadRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def presign_ticket_upload(ticket_id: int, payload: TicketPresignUploadRequest, db: Session = Depends(get_db), current_user: User = Depends(require_permission("attachment.upload"))):
     _ensure_s3_configured()
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
@@ -144,7 +145,7 @@ async def upload_ticket_attachment(
     ticket_id: int,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("attachment.upload")),
 ):
     _ensure_s3_configured()
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
@@ -192,7 +193,7 @@ async def upload_ticket_attachment(
 
 
 @router.post("/tickets/{ticket_id}/confirm", response_model=AttachmentRead)
-def confirm_ticket_upload(ticket_id: int, payload: TicketAttachmentConfirmRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def confirm_ticket_upload(ticket_id: int, payload: TicketAttachmentConfirmRequest, db: Session = Depends(get_db), current_user: User = Depends(require_permission("attachment.upload"))):
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="ticket not found")
@@ -224,7 +225,7 @@ def confirm_ticket_upload(ticket_id: int, payload: TicketAttachmentConfirmReques
 
 
 @router.get("/tickets/{ticket_id}", response_model=list[AttachmentRead])
-def list_ticket_attachments(ticket_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_ticket_attachments(ticket_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_permission("workitem.view"))):
     if not db.query(Ticket.id).filter(Ticket.id == ticket_id).first():
         raise HTTPException(status_code=404, detail="ticket not found")
     rows = db.query(Attachment).filter(Attachment.ticket_id == ticket_id).order_by(Attachment.id.desc()).all()
@@ -232,7 +233,7 @@ def list_ticket_attachments(ticket_id: int, db: Session = Depends(get_db), curre
 
 
 @router.get("/{attachment_id}", response_model=AttachmentRead)
-def get_attachment(attachment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_attachment(attachment_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_permission("workitem.view"))):
     attachment = db.query(Attachment).filter(Attachment.id == attachment_id).first()
     if not attachment:
         raise HTTPException(status_code=404, detail="attachment not found")

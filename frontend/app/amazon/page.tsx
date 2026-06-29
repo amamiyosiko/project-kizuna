@@ -14,7 +14,7 @@ import type {
 const categories = ["配送未到", "配送延迟", "商品破损", "商品不良", "缺件", "错发", "返品希望", "退款咨询", "使用方法", "差评风险", "其他"];
 
 const emptyStatus: AmazonStatus = {
-  stage: "v0.3.5",
+  stage: "v0.3.6",
   mode: "production_spapi",
   auto_sync_enabled: false,
   ready_for_next_stage: false,
@@ -180,7 +180,7 @@ export default function AmazonPage() {
       <div className="page-header">
         <div>
           <h2>Amazon 正式接入</h2>
-          <p>v0.3.5 接入真实 SP-API：先打通连接、订单同步和消息动作检查；不自动发送买家消息。</p>
+          <p>v0.3.6 细化权限和正式配置流程：密钥在配置中心填写，店铺资料在店铺管理填写。</p>
         </div>
         <div className="summary-pill">{status.ready_for_next_stage ? "正式接入准备完成" : "接入准备中"}</div>
       </div>
@@ -218,21 +218,49 @@ export default function AmazonPage() {
           <h3>Amazon JP 店铺准备</h3>
           <p>至少需要一个 Amazon 店铺填写 Seller ID，后续同步才知道订单属于哪个店铺。</p>
           <table className="compact-table">
-            <thead><tr><th>店铺</th><th>编码</th><th>Seller ID</th><th>状态</th></tr></thead>
+            <thead><tr><th>店铺</th><th>编码</th><th>Seller ID</th><th>同步</th><th>状态</th></tr></thead>
             <tbody>
               {status.stores.map(s => (
                 <tr key={s.id}>
                   <td>{s.store_name}</td>
                   <td>{s.store_code}</td>
                   <td>{s.seller_id || <span className="muted">未填写</span>}</td>
+                  <td><span className={`badge ${s.amazon_sync_enabled ? "success" : "muted-badge"}`}>{s.amazon_sync_enabled ? "已启用" : "未启用"}</span></td>
                   <td><span className={`badge ${s.seller_id_ready ? "success" : "muted-badge"}`}>{s.seller_id_ready ? "已准备" : "待补充"}</span></td>
                 </tr>
               ))}
-              {status.stores.length === 0 && <tr><td colSpan={4} className="empty-table">暂无 Amazon 店铺，请先到【店铺】新增。</td></tr>}
+              {status.stores.length === 0 && <tr><td colSpan={5} className="empty-table">暂无 Amazon 店铺，请先到【店铺】新增。</td></tr>}
             </tbody>
           </table>
         </section>
       </div>
+
+      <section className="card amazon-status-card">
+        <div className="section-title-row">
+          <div>
+            <h3>正式配置入口</h3>
+            <p>敏感密钥由超级管理员在配置中心维护；Seller ID 和同步开关在店铺管理维护。普通客服看不到这些入口。</p>
+          </div>
+        </div>
+        <div className="permission-hint-grid">
+          <div className="permission-hint-card">
+            <strong>1. Amazon SP-API 密钥</strong>
+            <p>LWA Client ID、Client Secret、Refresh Token、Marketplace ID、Amazon Region。</p>
+            <button className="btn secondary" type="button" onClick={() => router.push("/settings")}>去配置中心</button>
+          </div>
+          <div className="permission-hint-card">
+            <strong>2. Amazon 店铺资料</strong>
+            <p>维护店铺编码、Seller ID、Marketplace ID，并开启 Amazon 同步。</p>
+            <button className="btn secondary" type="button" onClick={() => router.push("/stores")}>去店铺管理</button>
+          </div>
+          <div className="permission-hint-card">
+            <strong>3. 权限说明</strong>
+            <p>只有拥有 amazon.sync 的账号可以同步订单；只有配置权限账号可以维护密钥。</p>
+            <button className="btn secondary" type="button" onClick={() => router.push("/settings")}>查看角色权限</button>
+          </div>
+        </div>
+      </section>
+
 
       <section className="card manual-import-card">
         <div className="section-title-row">

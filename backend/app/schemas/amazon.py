@@ -8,7 +8,9 @@ class AmazonStoreStatus(BaseModel):
     store_name: str
     store_code: str
     marketplace: str | None = None
+    marketplace_id: str | None = None
     seller_id: str | None = None
+    amazon_sync_enabled: bool | None = False
     status: str | None = None
     seller_id_ready: bool = False
 
@@ -25,7 +27,7 @@ class AmazonCredentialStatus(BaseModel):
 
 
 class AmazonStatusOut(BaseModel):
-    stage: str = "v0.3.5"
+    stage: str = "v0.3.6"
     mode: str = "production_spapi"
     auto_sync_enabled: bool = False
     ready_for_next_stage: bool = False

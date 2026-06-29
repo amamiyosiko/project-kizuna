@@ -5,6 +5,7 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, get_db
+from app.services.authz import require_permission
 from app.models import Store, Ticket, TicketEvent, TicketMessage, User
 from app.schemas.ticket import (
     TicketCreate,
@@ -63,7 +64,7 @@ def _count_by_status(db: Session, status: str) -> int:
 
 
 @router.get("/stats/summary", response_model=TicketStatsOut)
-def ticket_stats(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def ticket_stats(db: Session = Depends(get_db), current_user: User = Depends(require_permission("workitem.view"))):
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     return TicketStatsOut(
         total=db.query(func.count(Ticket.id)).scalar() or 0,
@@ -89,7 +90,7 @@ def list_tickets(
     risk_level: str | None = None,
     q: str | None = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("workitem.view")),
 ):
     query = db.query(Ticket)
     if store_id:
@@ -120,7 +121,7 @@ def list_tickets(
 
 
 @router.post("", response_model=TicketOut)
-def create_ticket(payload: TicketCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_ticket(payload: TicketCreate, db: Session = Depends(get_db), current_user: User = Depends(require_permission("workitem.create"))):
     store = db.query(Store).filter(Store.id == payload.store_id).first()
     if not store:
         raise HTTPException(status_code=404, detail="store not found")
@@ -167,7 +168,7 @@ def create_ticket(payload: TicketCreate, db: Session = Depends(get_db), current_
 
 
 @router.get("/{ticket_id}", response_model=TicketOut)
-def get_ticket(ticket_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_ticket(ticket_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_permission("workitem.view"))):
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="ticket not found")
@@ -175,7 +176,7 @@ def get_ticket(ticket_id: int, db: Session = Depends(get_db), current_user: User
 
 
 @router.patch("/{ticket_id}", response_model=TicketOut)
-def update_ticket(ticket_id: int, payload: TicketUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def update_ticket(ticket_id: int, payload: TicketUpdate, db: Session = Depends(get_db), current_user: User = Depends(require_permission("workitem.update"))):
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="ticket not found")
@@ -223,14 +224,14 @@ def update_ticket(ticket_id: int, payload: TicketUpdate, db: Session = Depends(g
 
 
 @router.get("/{ticket_id}/messages", response_model=list[TicketMessageOut])
-def list_ticket_messages(ticket_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_ticket_messages(ticket_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_permission("workitem.view"))):
     if not db.query(Ticket.id).filter(Ticket.id == ticket_id).first():
         raise HTTPException(status_code=404, detail="ticket not found")
     return db.query(TicketMessage).filter(TicketMessage.ticket_id == ticket_id).order_by(TicketMessage.id.asc()).all()
 
 
 @router.post("/{ticket_id}/messages", response_model=TicketMessageOut)
-def create_ticket_message(ticket_id: int, payload: TicketMessageCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def create_ticket_message(ticket_id: int, payload: TicketMessageCreate, db: Session = Depends(get_db), current_user: User = Depends(require_permission("workitem.reply"))):
     ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
     if not ticket:
         raise HTTPException(status_code=404, detail="ticket not found")
@@ -263,7 +264,7 @@ def create_ticket_message(ticket_id: int, payload: TicketMessageCreate, db: Sess
 
 
 @router.get("/{ticket_id}/events", response_model=list[TicketEventOut])
-def list_ticket_events(ticket_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_ticket_events(ticket_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_permission("workitem.view"))):
     if not db.query(Ticket.id).filter(Ticket.id == ticket_id).first():
         raise HTTPException(status_code=404, detail="ticket not found")
     return db.query(TicketEvent).filter(TicketEvent.ticket_id == ticket_id).order_by(TicketEvent.id.asc()).all()
