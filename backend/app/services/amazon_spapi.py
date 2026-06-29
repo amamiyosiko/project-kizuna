@@ -40,7 +40,9 @@ def _cfg(key: str, default: str | None = None) -> str:
     return get_config_value_fresh(key, default)
 
 
-def marketplace_id() -> str:
+def marketplace_id(value: str | None = None) -> str:
+    if value and value.strip():
+        return value.strip()
     return (_cfg("AMAZON_MARKETPLACE_ID", settings.AMAZON_MARKETPLACE_ID or "A1VC38T7YXB528") or "A1VC38T7YXB528").strip()
 
 
@@ -66,10 +68,10 @@ def signing_region_for_endpoint(endpoint: str) -> str:
     return "us-east-1"
 
 
-def get_lwa_access_token() -> dict[str, Any]:
+def get_lwa_access_token(refresh_token_override: str | None = None) -> dict[str, Any]:
     client_id = _cfg("AMAZON_LWA_CLIENT_ID", settings.AMAZON_LWA_CLIENT_ID or "")
     client_secret = _cfg("AMAZON_LWA_CLIENT_SECRET", settings.AMAZON_LWA_CLIENT_SECRET or "")
-    refresh_token = _cfg("AMAZON_REFRESH_TOKEN", settings.AMAZON_REFRESH_TOKEN or "")
+    refresh_token = refresh_token_override or _cfg("AMAZON_REFRESH_TOKEN", settings.AMAZON_REFRESH_TOKEN or "")
     required = {
         "AMAZON_LWA_CLIENT_ID": client_id,
         "AMAZON_LWA_CLIENT_SECRET": client_secret,
@@ -113,13 +115,14 @@ def call_spapi(
     path: str,
     params: dict[str, Any] | None = None,
     body: dict[str, Any] | None = None,
+    refresh_token: str | None = None,
 ) -> dict[str, Any]:
     endpoint = endpoint_for_region()
-    token = get_lwa_access_token()["access_token"]
+    token = get_lwa_access_token(refresh_token)["access_token"]
     data = json.dumps(body, ensure_ascii=False).encode("utf-8") if body is not None else None
     headers = {
         "host": urlparse(endpoint).netloc,
-        "user-agent": "ProjectKizuna/0.3.7 (Language=Python/3.12)",
+        "user-agent": "ProjectKizuna/0.3.8 (Language=Python/3.12)",
         "x-amz-access-token": token,
         "accept": "application/json",
     }
@@ -148,7 +151,7 @@ def call_spapi(
         return {"status_code": resp.status_code, "raw": text[:1000]}
 
 
-def get_recent_orders(days: int = 3, max_results: int = 20) -> dict[str, Any]:
+def get_recent_orders(days: int = 3, max_results: int = 20, marketplace_id_override: str | None = None, refresh_token: str | None = None) -> dict[str, Any]:
     days = min(max(days, 1), 30)
     max_results = min(max(max_results, 1), 100)
     created_after = (datetime.now(timezone.utc) - timedelta(days=days)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -156,10 +159,11 @@ def get_recent_orders(days: int = 3, max_results: int = 20) -> dict[str, Any]:
         "GET",
         "/orders/v0/orders",
         params={
-            "MarketplaceIds": marketplace_id(),
+            "MarketplaceIds": marketplace_id(marketplace_id_override),
             "CreatedAfter": created_after,
             "MaxResultsPerPage": max_results,
         },
+        refresh_token=refresh_token,
     )
 
 
@@ -182,7 +186,7 @@ def extract_next_token(data: dict[str, Any]) -> str | None:
     return str(token) if token else None
 
 
-def get_recent_orders_pages(days: int = 3, max_results: int = 20, page_limit: int = 1) -> tuple[list[dict[str, Any]], int]:
+def get_recent_orders_pages(days: int = 3, max_results: int = 20, page_limit: int = 1, marketplace_id_override: str | None = None, refresh_token: str | None = None) -> tuple[list[dict[str, Any]], int]:
     """Fetch recent orders with limited pagination.
 
     Returns a tuple of (orders, pages_fetched). The page limit is intentionally
@@ -200,11 +204,11 @@ def get_recent_orders_pages(days: int = 3, max_results: int = 20, page_limit: in
             params = {"NextToken": next_token}
         else:
             params = {
-                "MarketplaceIds": marketplace_id(),
+                "MarketplaceIds": marketplace_id(marketplace_id_override),
                 "CreatedAfter": created_after,
                 "MaxResultsPerPage": max_results,
             }
-        data = call_spapi("GET", "/orders/v0/orders", params=params)
+        data = call_spapi("GET", "/orders/v0/orders", params=params, refresh_token=refresh_token)
         pages += 1
         orders.extend(extract_orders(data))
         next_token = extract_next_token(data)
@@ -213,11 +217,12 @@ def get_recent_orders_pages(days: int = 3, max_results: int = 20, page_limit: in
     return orders, pages
 
 
-def get_messaging_actions_for_order(amazon_order_id: str) -> dict[str, Any]:
+def get_messaging_actions_for_order(amazon_order_id: str, marketplace_id_override: str | None = None, refresh_token: str | None = None) -> dict[str, Any]:
     return call_spapi(
         "GET",
         f"/messaging/v1/orders/{amazon_order_id}/messages",
-        params={"marketplaceIds": marketplace_id()},
+        params={"marketplaceIds": marketplace_id(marketplace_id_override)},
+        refresh_token=refresh_token,
     )
 
 

@@ -35,6 +35,7 @@ from app.services.amazon_spapi import (
     get_recent_orders_pages,
     has_real_value,
 )
+from app.services.app_config import decrypt_value, get_config_value
 from app.services.authz import require_permission
 
 router = APIRouter(prefix="/amazon", tags=["amazon"])
@@ -51,13 +52,28 @@ def _audit(db: Session, actor: User | None, action: str, resource_type: str | No
     ))
 
 
-def _credential_status() -> AmazonCredentialStatus:
+def _store_refresh_token(store: Store) -> str:
+    token = decrypt_value(getattr(store, "amazon_refresh_token_encrypted", None)) if getattr(store, "amazon_refresh_token_encrypted", None) else ""
+    return token.strip()
+
+
+def _any_store_refresh_token(db: Session) -> bool:
+    for store in _amazon_stores(db):
+        if has_real_value(_store_refresh_token(store)):
+            return True
+    return has_real_value(get_config_value(db, "AMAZON_REFRESH_TOKEN", ""))
+
+
+def _credential_status(db: Session) -> AmazonCredentialStatus:
     overview = configuration_overview()
+    client_id = get_config_value(db, "AMAZON_LWA_CLIENT_ID", "")
+    client_secret = get_config_value(db, "AMAZON_LWA_CLIENT_SECRET", "")
+    marketplace = get_config_value(db, "AMAZON_MARKETPLACE_ID", "A1VC38T7YXB528")
     return AmazonCredentialStatus(
-        lwa_client_id=bool(overview.get("lwa_ready")),
-        lwa_client_secret=bool(overview.get("lwa_ready")),
-        refresh_token=bool(overview.get("lwa_ready")),
-        marketplace_id=has_real_value(str(overview.get("marketplace_id") or "")),
+        lwa_client_id=has_real_value(client_id),
+        lwa_client_secret=has_real_value(client_secret),
+        refresh_token=_any_store_refresh_token(db),
+        marketplace_id=has_real_value(str(marketplace or "")),
         endpoint_region=str(overview.get("endpoint_region") or "jp"),
         endpoint=overview.get("endpoint"),
         signing_region=overview.get("signing_region"),
@@ -269,23 +285,25 @@ def amazon_status(db: Session = Depends(get_db), current_user: User = Depends(re
             amazon_sync_enabled=bool(s.amazon_sync_enabled),
             status=s.status,
             seller_id_ready=bool((s.seller_id or "").strip()),
+            refresh_token_ready=has_real_value(_store_refresh_token(s)),
+            last_sync_at=getattr(s, "amazon_last_sync_at", None),
         )
         for s in stores
     ]
-    credentials = _credential_status()
+    credentials = _credential_status(db)
     missing: list[str] = []
     if not credentials.lwa_client_id:
         missing.append("AMAZON_LWA_CLIENT_ID")
     if not credentials.lwa_client_secret:
         missing.append("AMAZON_LWA_CLIENT_SECRET")
     if not credentials.refresh_token:
-        missing.append("AMAZON_REFRESH_TOKEN")
+        missing.append("至少一个 Amazon 店铺需要配置 Refresh Token")
     if not credentials.marketplace_id:
         missing.append("AMAZON_MARKETPLACE_ID")
     if not credentials.aws_signing_ready:
         missing.append("AWS 签名凭证 / EC2 Role")
-    if not any(s.seller_id_ready and s.amazon_sync_enabled for s in store_statuses):
-        missing.append("至少一个 Amazon 店铺需要 Seller ID，并开启 Amazon 同步")
+    if not any(s.seller_id_ready and s.refresh_token_ready and s.amazon_sync_enabled for s in store_statuses):
+        missing.append("至少一个 Amazon 店铺需要 Seller ID、Refresh Token，并开启 Amazon 同步")
 
     ready = len(missing) == 0
     return AmazonStatusOut(
@@ -322,14 +340,19 @@ def test_amazon_connection(
     current_user: User = Depends(require_permission("amazon.sync")),
 ):
     try:
-        data = get_recent_orders(days=payload.days, max_results=1)
+        store = db.query(Store).filter(Store.id == payload.store_id, Store.platform == "Amazon").first() if payload.store_id else None
+        refresh_token = _store_refresh_token(store) if store else None
+        marketplace = store.marketplace_id if store else None
+        data = get_recent_orders(days=payload.days, max_results=1, marketplace_id_override=marketplace, refresh_token=refresh_token)
         orders = extract_orders(data)
         overview = configuration_overview()
         return AmazonConnectionTestResponse(
             success=True,
             message="SP-API 连接成功。即使最近没有订单，只要接口返回成功，就说明 LWA 与 AWS 签名链路已打通。",
             endpoint=overview.get("endpoint"),
-            marketplace_id=overview.get("marketplace_id"),
+            marketplace_id=marketplace or overview.get("marketplace_id"),
+            store_id=store.id if store else None,
+            store_name=store.store_name if store else None,
             order_count=len(orders),
             sample_order_ids=[o.get("AmazonOrderId", "") for o in orders if o.get("AmazonOrderId")][:5],
         )
@@ -351,6 +374,8 @@ def import_recent_orders(
         raise HTTPException(status_code=400, detail="该店铺尚未开启 Amazon 同步")
     if not (store.seller_id or "").strip():
         raise HTTPException(status_code=400, detail="该店铺缺少 Seller ID")
+    if not has_real_value(_store_refresh_token(store)):
+        raise HTTPException(status_code=400, detail="该店铺缺少 Refresh Token，请到店铺管理填写")
 
     run = AmazonSyncRun(
         store_id=store.id,
@@ -365,7 +390,7 @@ def import_recent_orders(
     db.flush()
 
     try:
-        orders, pages = get_recent_orders_pages(days=payload.days, max_results=payload.max_results, page_limit=payload.page_limit)
+        orders, pages = get_recent_orders_pages(days=payload.days, max_results=payload.max_results, page_limit=payload.page_limit, marketplace_id_override=store.marketplace_id, refresh_token=_store_refresh_token(store))
     except AmazonSPAPIError as exc:
         run.status = "failed"
         run.error_message = str(exc)[:1000]
@@ -412,6 +437,7 @@ def import_recent_orders(
     run.ticket_updated_count = ticket_updated
     run.skipped_count = skipped
     run.finished_at = datetime.utcnow()
+    store.amazon_last_sync_at = run.finished_at
     _audit(db, current_user, "amazon.sync.success", "store", store.store_code, {
         "pages": pages,
         "fetched": len(orders),
@@ -452,7 +478,8 @@ def check_messaging_actions(
     if not amazon_order_id:
         raise HTTPException(status_code=400, detail="amazon_order_id is required")
     try:
-        data = get_messaging_actions_for_order(amazon_order_id)
+        store = db.query(Store).filter(Store.id == payload.store_id, Store.platform == "Amazon").first() if payload.store_id else None
+        data = get_messaging_actions_for_order(amazon_order_id, marketplace_id_override=store.marketplace_id if store else None, refresh_token=_store_refresh_token(store) if store else None)
     except AmazonSPAPIError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

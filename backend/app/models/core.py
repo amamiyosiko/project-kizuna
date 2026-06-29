@@ -112,6 +112,8 @@ class Store(Base):
     marketplace_id = Column(String(80), default="A1VC38T7YXB528")
     seller_id = Column(String(150))
     amazon_sync_enabled = Column(Boolean, default=False)
+    amazon_refresh_token_encrypted = Column(Text)
+    amazon_last_sync_at = Column(DateTime)
     status = Column(String(30), default="active")
     note = Column(Text)
     created_at = Column(DateTime, server_default=func.now())

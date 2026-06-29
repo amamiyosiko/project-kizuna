@@ -15,7 +15,7 @@ import type {
 const categories = ["配送未到", "配送延迟", "商品破损", "商品不良", "缺件", "错发", "返品希望", "退款咨询", "使用方法", "差评风险", "其他"];
 
 const emptyStatus: AmazonStatus = {
-  stage: "v0.3.7",
+  stage: "v0.3.8",
   mode: "production_spapi_sync",
   auto_sync_enabled: false,
   ready_for_next_stage: false,
@@ -105,10 +105,10 @@ export default function AmazonPage() {
     try {
       const result = await apiFetch<AmazonConnectionTestResponse>("/amazon/test-connection", {
         method: "POST",
-        body: JSON.stringify({ days: syncDays }),
+        body: JSON.stringify({ store_id: form.store_id || undefined, days: syncDays }),
       });
       setTestResult(result);
-      setMessage("SP-API 连接成功。可以继续同步最近订单。");
+      setMessage(result.store_name ? `SP-API 连接成功：${result.store_name}` : "SP-API 连接成功。可以继续同步最近订单。");
     } catch (err) {
       setError(err instanceof Error ? `SP-API 连接失败：${err.message}` : "SP-API 连接失败。");
     } finally {
@@ -153,7 +153,7 @@ export default function AmazonPage() {
     try {
       const result = await apiFetch<AmazonMessagingActionsResponse>("/amazon/messaging-actions", {
         method: "POST",
-        body: JSON.stringify({ amazon_order_id: actionOrderId.trim() }),
+        body: JSON.stringify({ amazon_order_id: actionOrderId.trim(), store_id: form.store_id || undefined }),
       });
       setActionsResult(result);
       setMessage(`已查询可发送消息动作：${result.available_actions_count} 个。`);
@@ -196,7 +196,7 @@ export default function AmazonPage() {
       <div className="page-header">
         <div>
           <h2>Amazon 正式接入</h2>
-          <p>v0.3.7 增强实际同步流程：分页拉取订单、写入订单表、创建/更新工作项，并记录同步任务。</p>
+          <p>v0.3.8 支持多店铺 Amazon 授权：全局应用配置与店铺 Refresh Token 分开管理，再按店铺同步订单。</p>
         </div>
         <div className="summary-pill">{status.ready_for_next_stage ? "正式接入准备完成" : "接入准备中"}</div>
       </div>
@@ -234,18 +234,20 @@ export default function AmazonPage() {
           <h3>Amazon JP 店铺准备</h3>
           <p>至少需要一个 Amazon 店铺填写 Seller ID，并开启同步。</p>
           <table className="compact-table">
-            <thead><tr><th>店铺</th><th>编码</th><th>Seller ID</th><th>同步</th><th>状态</th></tr></thead>
+            <thead><tr><th>店铺</th><th>编码</th><th>Seller ID</th><th>Refresh Token</th><th>同步</th><th>最后同步</th><th>状态</th></tr></thead>
             <tbody>
               {status.stores.map(s => (
                 <tr key={s.id}>
                   <td>{s.store_name}</td>
                   <td>{s.store_code}</td>
                   <td>{s.seller_id || <span className="muted">未填写</span>}</td>
+                  <td><span className={`badge ${s.refresh_token_ready ? "success" : "muted-badge"}`}>{s.refresh_token_ready ? "已配置" : "未配置"}</span></td>
                   <td><span className={`badge ${s.amazon_sync_enabled ? "success" : "muted-badge"}`}>{s.amazon_sync_enabled ? "已启用" : "未启用"}</span></td>
-                  <td><span className={`badge ${s.seller_id_ready ? "success" : "muted-badge"}`}>{s.seller_id_ready ? "已准备" : "待补充"}</span></td>
+                  <td>{s.last_sync_at ? formatDate(s.last_sync_at) : "-"}</td>
+                  <td><span className={`badge ${s.seller_id_ready && s.refresh_token_ready && s.amazon_sync_enabled ? "success" : "muted-badge"}`}>{s.seller_id_ready && s.refresh_token_ready && s.amazon_sync_enabled ? "已准备" : "待补充"}</span></td>
                 </tr>
               ))}
-              {status.stores.length === 0 && <tr><td colSpan={5} className="empty-table">暂无 Amazon 店铺，请先到【店铺】新增。</td></tr>}
+              {status.stores.length === 0 && <tr><td colSpan={7} className="empty-table">暂无 Amazon 店铺，请先到【店铺】新增。</td></tr>}
             </tbody>
           </table>
         </section>
@@ -281,7 +283,7 @@ export default function AmazonPage() {
             <button className="btn secondary" type="button" disabled={testing} onClick={testConnection}>{testing ? "连接测试中..." : "测试 SP-API 连接"}</button>
             <button className="btn" type="button" disabled={syncing} onClick={syncOrders}>{syncing ? "同步中..." : "同步最近订单"}</button>
           </div>
-          {testResult && <div className="error-box neutral">{testResult.message} 最近样本订单：{testResult.sample_order_ids.join(" / ") || "无"}</div>}
+          {testResult && <div className="error-box neutral">{testResult.message} {testResult.store_name ? `店铺：${testResult.store_name}；` : ""}最近样本订单：{testResult.sample_order_ids.join(" / ") || "无"}</div>}
           {syncResult && <div className="error-box neutral">拉取 {syncResult.fetched_count} 单；订单新增 {syncResult.order_created_count}、更新 {syncResult.order_updated_count}；工作项新增 {syncResult.ticket_created_count}、更新 {syncResult.ticket_updated_count}；跳过 {syncResult.skipped_count}。</div>}
         </div>
       </section>
@@ -324,12 +326,12 @@ export default function AmazonPage() {
         <div className="permission-hint-grid">
           <div className="permission-hint-card">
             <strong>1. Amazon SP-API 密钥</strong>
-            <p>LWA Client ID、Client Secret、Refresh Token、Marketplace ID、Amazon Region。</p>
-            <button className="btn secondary" type="button" onClick={() => router.push("/settings")}>去配置中心</button>
+            <p>LWA Client ID、Client Secret、默认 Marketplace ID、Amazon Region。</p>
+            <button className="btn secondary" type="button" onClick={() => router.push("/settings/amazon")}>去 Amazon 配置</button>
           </div>
           <div className="permission-hint-card">
             <strong>2. Amazon 店铺资料</strong>
-            <p>维护店铺编码、Seller ID、Marketplace ID，并开启 Amazon 同步。</p>
+            <p>维护店铺编码、Seller ID、Marketplace ID、Refresh Token，并开启 Amazon 同步。</p>
             <button className="btn secondary" type="button" onClick={() => router.push("/stores")}>去店铺管理</button>
           </div>
           <div className="permission-hint-card">

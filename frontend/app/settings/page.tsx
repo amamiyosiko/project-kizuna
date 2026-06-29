@@ -196,7 +196,7 @@ export default function SettingsPage() {
       <div className="page-header">
         <div>
           <h2>系统设置</h2>
-          <p>v0.3.7 细化权限控制、配置中心和正式接入流程。</p>
+          <p>v0.3.8 细化权限控制、配置中心和正式接入流程。</p>
         </div>
         <div className="summary-pill">当前角色：{me?.role_name || me?.role || "-"}</div>
       </div>
@@ -281,29 +281,25 @@ export default function SettingsPage() {
         </section>
 
         <section className="card settings-panel-wide">
-          <div className="panel-title"><h3>配置中心</h3><span>Config</span></div>
+          <div className="panel-title"><h3>配置中心</h3><span>v0.3.8</span></div>
           {!can("config.manage") && <p className="muted">当前账号没有配置管理权限。</p>}
           {can("config.manage") && (
-            <div className="config-grid">
-              {configs.map(item => (
-                <div className="config-item" key={item.key}>
-                  <div>
-                    <strong>{item.label}</strong>
-                    <span>{item.key} · {item.group} · {item.source}</span>
-                    <em className={item.configured ? "ok" : "warn"}>{item.configured ? `已配置：${item.value}` : "未配置"}</em>
-                  </div>
-                  <div className="config-edit-row">
-                    <input
-                      className="input"
-                      type={item.is_secret ? "password" : "text"}
-                      placeholder={item.is_secret ? "粘贴完整密钥保存，页面不会回显" : configPlaceholders[item.key] || "配置值"}
-                      value={configDraft[item.key] || ""}
-                      onChange={e => setConfigDraft({ ...configDraft, [item.key]: e.target.value })}
-                    />
-                    <button className="btn secondary" onClick={() => saveConfig(item)} disabled={loading || (item.is_secret && !can("config.secret.manage"))}>保存</button>
-                  </div>
-                </div>
-              ))}
+            <div className="permission-hint-grid">
+              <div className="permission-hint-card">
+                <strong>AI 配置</strong>
+                <p>管理 OpenAI、Gemini、默认 Provider 和模型名称。</p>
+                <button className="btn secondary" onClick={() => router.push("/settings/ai")}>进入 AI 配置</button>
+              </div>
+              <div className="permission-hint-card">
+                <strong>Amazon 全局配置</strong>
+                <p>管理 LWA Client ID、Client Secret、默认 Marketplace ID 和 Region。</p>
+                <button className="btn secondary" onClick={() => router.push("/settings/amazon")}>进入 Amazon 配置</button>
+              </div>
+              <div className="permission-hint-card">
+                <strong>多店铺授权</strong>
+                <p>每家店铺单独维护 Seller ID、Refresh Token 和同步开关。</p>
+                <button className="btn secondary" onClick={() => router.push("/stores")}>进入店铺管理</button>
+              </div>
             </div>
           )}
         </section>

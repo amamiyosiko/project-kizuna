@@ -7,6 +7,9 @@ export type Store = {
   marketplace_id?: string;
   seller_id?: string;
   amazon_sync_enabled?: boolean;
+  amazon_refresh_token_configured?: boolean;
+  amazon_refresh_token_masked?: string;
+  amazon_last_sync_at?: string;
   status?: string;
   note?: string;
   created_at?: string;
@@ -175,8 +178,13 @@ export type AmazonStoreStatus = {
   marketplace_id?: string;
   seller_id?: string;
   amazon_sync_enabled?: boolean;
+  amazon_refresh_token_configured?: boolean;
+  amazon_refresh_token_masked?: string;
+  amazon_last_sync_at?: string;
   status?: string;
   seller_id_ready: boolean;
+  refresh_token_ready?: boolean;
+  last_sync_at?: string;
 };
 
 export type AmazonCredentialStatus = {
@@ -214,6 +222,8 @@ export type AmazonConnectionTestResponse = {
   message: string;
   endpoint?: string;
   marketplace_id?: string;
+  store_id?: number;
+  store_name?: string;
   order_count: number;
   sample_order_ids: string[];
 };

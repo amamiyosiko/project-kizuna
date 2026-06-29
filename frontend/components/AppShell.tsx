@@ -58,7 +58,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         <nav className="admin-nav">
           {visibleNav.map(item => {
-            const active = pathname === item.href || (item.href === "/workspace" && pathname.startsWith("/workspace"));
+            const active = pathname === item.href || (item.href === "/workspace" && pathname.startsWith("/workspace")) || (item.href === "/settings" && pathname.startsWith("/settings"));
             return (
               <Link key={item.href} href={item.href} className={active ? "active" : ""}>
                 <span>{item.icon}</span>
@@ -70,7 +70,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="admin-sidebar-footer">
           <span>{profile?.role_name || "生产环境"}</span>
-          <strong>v0.3.7</strong>
+          <strong>v0.3.8</strong>
         </div>
       </aside>
 

@@ -15,6 +15,8 @@ class AmazonStoreStatus(BaseModel):
     amazon_sync_enabled: bool | None = False
     status: str | None = None
     seller_id_ready: bool = False
+    refresh_token_ready: bool = False
+    last_sync_at: datetime | None = None
 
 
 class AmazonCredentialStatus(BaseModel):
@@ -29,15 +31,15 @@ class AmazonCredentialStatus(BaseModel):
 
 
 class AmazonStatusOut(BaseModel):
-    stage: str = "v0.3.7"
-    mode: str = "production_spapi_sync"
+    stage: str = "v0.3.8"
+    mode: str = "production_spapi_multi_store"
     auto_sync_enabled: bool = False
     ready_for_next_stage: bool = False
     credentials: AmazonCredentialStatus
     stores: list[AmazonStoreStatus] = []
     missing_items: list[str] = []
     next_step: str | None = None
-    official_limit_note: str = "v0.3.7 强化订单同步与工作项生成；买家站内信收件箱仍不作为本阶段自动拉取对象。"
+    official_limit_note: str = "v0.3.8 将 Amazon 应用配置与店铺授权拆开管理；每家店铺可单独维护 Seller ID、Refresh Token 与同步开关。"
 
 
 class AmazonManualImportRequest(BaseModel):
@@ -61,6 +63,7 @@ class AmazonManualImportResponse(BaseModel):
 
 
 class AmazonConnectionTestRequest(BaseModel):
+    store_id: int | None = None
     days: int = Field(default=3, ge=1, le=30)
 
 
@@ -69,6 +72,8 @@ class AmazonConnectionTestResponse(BaseModel):
     message: str
     endpoint: str | None = None
     marketplace_id: str | None = None
+    store_id: int | None = None
+    store_name: str | None = None
     order_count: int = 0
     sample_order_ids: list[str] = []
 
@@ -117,6 +122,7 @@ class AmazonImportOrdersResponse(BaseModel):
 
 class AmazonMessagingActionsRequest(BaseModel):
     amazon_order_id: str
+    store_id: int | None = None
 
 
 class AmazonMessagingActionsResponse(BaseModel):
