@@ -36,11 +36,11 @@ router = APIRouter(prefix="/amazon", tags=["amazon"])
 def _credential_status() -> AmazonCredentialStatus:
     overview = configuration_overview()
     return AmazonCredentialStatus(
-        lwa_client_id=has_real_value(settings.AMAZON_LWA_CLIENT_ID),
-        lwa_client_secret=has_real_value(settings.AMAZON_LWA_CLIENT_SECRET),
-        refresh_token=has_real_value(settings.AMAZON_REFRESH_TOKEN),
-        marketplace_id=has_real_value(settings.AMAZON_MARKETPLACE_ID),
-        endpoint_region=settings.AMAZON_REGION or "jp",
+        lwa_client_id=bool(overview.get("lwa_ready")),
+        lwa_client_secret=bool(overview.get("lwa_ready")),
+        refresh_token=bool(overview.get("lwa_ready")),
+        marketplace_id=has_real_value(str(overview.get("marketplace_id") or "")),
+        endpoint_region=str(overview.get("endpoint_region") or "jp"),
         endpoint=overview.get("endpoint"),
         signing_region=overview.get("signing_region"),
         aws_signing_ready=bool(overview.get("aws_signing_ready")),

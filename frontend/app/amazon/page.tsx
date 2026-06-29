@@ -14,7 +14,7 @@ import type {
 const categories = ["配送未到", "配送延迟", "商品破损", "商品不良", "缺件", "错发", "返品希望", "退款咨询", "使用方法", "差评风险", "其他"];
 
 const emptyStatus: AmazonStatus = {
-  stage: "v0.3.4.1",
+  stage: "v0.3.5",
   mode: "production_spapi",
   auto_sync_enabled: false,
   ready_for_next_stage: false,
@@ -180,7 +180,7 @@ export default function AmazonPage() {
       <div className="page-header">
         <div>
           <h2>Amazon 正式接入</h2>
-          <p>v0.3.4.1 接入真实 SP-API：先打通连接、订单同步和消息动作检查；不自动发送买家消息。</p>
+          <p>v0.3.5 接入真实 SP-API：先打通连接、订单同步和消息动作检查；不自动发送买家消息。</p>
         </div>
         <div className="summary-pill">{status.ready_for_next_stage ? "正式接入准备完成" : "接入准备中"}</div>
       </div>

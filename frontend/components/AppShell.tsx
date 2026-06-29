@@ -49,7 +49,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="admin-sidebar-footer">
           <span>生产环境</span>
-          <strong>v0.3.4.1</strong>
+          <strong>v0.3.5</strong>
         </div>
       </aside>
 

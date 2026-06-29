@@ -10,8 +10,33 @@ from typing import Any
 
 from app.ai.reply_generator import generate_rule_based_reply
 from app.core.config import settings
+from app.services.app_config import get_config_value_fresh
 
 logger = logging.getLogger(__name__)
+
+
+def _cfg(key: str, default: str | None = None) -> str:
+    return get_config_value_fresh(key, default)
+
+
+def _openai_key() -> str:
+    return _cfg("OPENAI_API_KEY", settings.OPENAI_API_KEY or "")
+
+
+def _openai_model() -> str:
+    return _cfg("OPENAI_MODEL", settings.OPENAI_MODEL) or settings.OPENAI_MODEL
+
+
+def _gemini_key() -> str:
+    return _cfg("GEMINI_API_KEY", settings.GEMINI_API_KEY or "")
+
+
+def _gemini_model() -> str:
+    return _cfg("GEMINI_MODEL", settings.GEMINI_MODEL) or settings.GEMINI_MODEL
+
+
+def _default_provider() -> str:
+    return _cfg("AI_PROVIDER", settings.AI_PROVIDER) or settings.AI_PROVIDER
 
 SUPPORTED_PROVIDERS = {"auto", "openai", "gemini", "rule"}
 
@@ -145,14 +170,16 @@ def _rule_reply(message: str, tone: str, reason: str | None = None) -> dict[str,
 
 
 def _generate_openai(message: str, tone: str, context: AIContext | None = None) -> dict[str, Any]:
-    if not settings.OPENAI_API_KEY or settings.OPENAI_API_KEY in {"your_openai_api_key", "你的真实key"}:
+    api_key = _openai_key()
+    model = _openai_model()
+    if not api_key or api_key in {"your_openai_api_key", "你的真实key"}:
         raise RuntimeError("OPENAI_API_KEY is not configured")
     from openai import OpenAI
 
     prompt = _build_prompt(message, tone, context)
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    client = OpenAI(api_key=api_key)
     response = client.chat.completions.create(
-        model=settings.OPENAI_MODEL,
+        model=model,
         messages=[
             {"role": "system", "content": "You are a safe Japanese Amazon customer support reply assistant. Return JSON only."},
             {"role": "user", "content": prompt},
@@ -162,15 +189,16 @@ def _generate_openai(message: str, tone: str, context: AIContext | None = None) 
     )
     content = response.choices[0].message.content or ""
     parsed = _safe_json_loads(content)
-    return _normalize_result(parsed, message, tone, "openai", settings.OPENAI_MODEL)
+    return _normalize_result(parsed, message, tone, "openai", model)
 
 
 def _generate_gemini(message: str, tone: str, context: AIContext | None = None) -> dict[str, Any]:
-    if not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY in {"your_gemini_api_key", "你的gemini真实key"}:
+    api_key = _gemini_key()
+    if not api_key or api_key in {"your_gemini_api_key", "你的gemini真实key"}:
         raise RuntimeError("GEMINI_API_KEY is not configured")
     prompt = _build_prompt(message, tone, context)
-    model = settings.GEMINI_MODEL
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={settings.GEMINI_API_KEY}"
+    model = _gemini_model()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
     payload = {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "generationConfig": {
@@ -204,7 +232,7 @@ def generate_ai_customer_reply(
     provider: str | None = "auto",
     context: AIContext | None = None,
 ) -> dict[str, Any]:
-    requested = _normalize_provider(provider or settings.AI_PROVIDER)
+    requested = _normalize_provider(provider or _default_provider())
     if requested == "rule":
         return _rule_reply(message, tone, "已手动选择备用规则回复。")
 
@@ -223,7 +251,7 @@ def generate_ai_customer_reply(
             return _rule_reply(message, tone, f"Gemini 调用失败，已降级备用规则：{exc}")
 
     # auto: prefer configured default, then try the other provider, then rule.
-    preferred = _normalize_provider(settings.AI_PROVIDER)
+    preferred = _normalize_provider(_default_provider())
     order = [preferred] if preferred in {"openai", "gemini"} else []
     for candidate in ["openai", "gemini"]:
         if candidate not in order:

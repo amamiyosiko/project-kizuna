@@ -4,7 +4,9 @@ export type Store = {
   store_code: string;
   platform?: string;
   marketplace?: string;
+  marketplace_id?: string;
   seller_id?: string;
+  amazon_sync_enabled?: boolean;
   status?: string;
   note?: string;
   created_at?: string;
@@ -170,7 +172,9 @@ export type AmazonStoreStatus = {
   store_name: string;
   store_code: string;
   marketplace?: string;
+  marketplace_id?: string;
   seller_id?: string;
+  amazon_sync_enabled?: boolean;
   status?: string;
   seller_id_ready: boolean;
 };
@@ -229,4 +233,66 @@ export type AmazonMessagingActionsResponse = {
   available_actions_count: number;
   available_action_titles: string[];
   raw_keys: string[];
+};
+
+export type UserProfile = {
+  id: number;
+  username: string;
+  role: string;
+  role_name?: string;
+  status: string;
+  must_change_password?: boolean;
+  permissions?: string[];
+};
+
+export type Permission = {
+  id: number;
+  code: string;
+  name: string;
+  group?: string;
+  description?: string;
+};
+
+export type Role = {
+  id: number;
+  name: string;
+  code: string;
+  description?: string;
+  status?: string;
+  is_system?: boolean;
+  permissions: string[];
+};
+
+export type AdminUser = {
+  id: number;
+  username: string;
+  email?: string;
+  full_name?: string;
+  role?: string;
+  role_id?: number;
+  role_name?: string;
+  status?: string;
+  must_change_password?: boolean;
+  created_at?: string;
+};
+
+export type ConfigItem = {
+  key: string;
+  group: string;
+  label: string;
+  is_secret: boolean;
+  configured: boolean;
+  value: string;
+  source: string;
+};
+
+export type AuditLog = {
+  id: number;
+  actor_user_id?: number;
+  action: string;
+  resource_type?: string;
+  resource_id?: string;
+  detail?: string;
+  ip_address?: string;
+  created_at?: string;
 };

@@ -11,6 +11,7 @@ from app.core.security import (
 )
 from app.db.session import get_db
 from app.models import User
+from app.services.authz import get_user_permissions, get_user_role
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, RefreshRequest, TokenResponse, UserProfile
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -47,13 +48,17 @@ def refresh(payload: RefreshRequest, db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserProfile)
-def me(user: User = Depends(get_current_user)):
+def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    role = get_user_role(db, user)
+    permissions = sorted(get_user_permissions(db, user))
     return UserProfile(
         id=user.id,
         username=user.username,
-        role=getattr(user, "role", None) or "staff",
+        role=role.code if role else (getattr(user, "role", None) or "agent"),
+        role_name=role.name if role else None,
         status=user.status,
         must_change_password=bool(getattr(user, "must_change_password", False)),
+        permissions=permissions,
     )
 
 
@@ -72,4 +77,4 @@ def change_password(
     db.add(user)
     db.commit()
     db.refresh(user)
-    return me(user)
+    return me(user, db)

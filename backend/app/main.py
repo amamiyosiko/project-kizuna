@@ -1,40 +1,56 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
-from app.api.v1 import ai, amazon, attachments, auth, conversations, dashboard, messages, stores, templates, tickets
+from app.api.v1 import admin, ai, amazon, attachments, auth, conversations, dashboard, messages, stores, templates, tickets
 from app.core.config import settings
 from app.core.security import get_password_hash
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
 from app.models import *  # noqa
 from app.models import ReplyTemplate, Role, Store, User
+from app.services.authz import seed_permissions_and_roles
 
 Base.metadata.create_all(bind=engine)
+
+
+def _rbac_schema_ready() -> bool:
+    try:
+        inspector = inspect(engine)
+        tables = set(inspector.get_table_names())
+        if not {"permissions", "role_permissions", "system_configs", "audit_logs"}.issubset(tables):
+            return False
+        role_columns = {col["name"] for col in inspector.get_columns("roles")}
+        store_columns = {col["name"] for col in inspector.get_columns("stores")}
+        return {"status", "is_system", "updated_at"}.issubset(role_columns) and {"marketplace_id", "amazon_sync_enabled"}.issubset(store_columns)
+    except Exception:
+        return False
 
 
 def seed_defaults() -> None:
     db: Session = SessionLocal()
     try:
-        if not db.query(Role).filter(Role.code == "admin").first():
-            db.add_all([
-                Role(name="管理员", code="admin", description="系统管理员"),
-                Role(name="客服人员", code="staff", description="日常客服处理"),
-            ])
-            db.commit()
+        rbac_ready = _rbac_schema_ready()
+        if rbac_ready:
+            seed_permissions_and_roles(db)
         if not db.query(User).filter(User.username == "admin").first():
+            super_admin_role = db.query(Role).filter(Role.code == "super_admin").first() if rbac_ready else None
             db.add(User(
                 username="admin",
                 email="admin@example.local",
                 password_hash=get_password_hash("admin123456"),
                 full_name="Project Kizuna Admin",
-                role="admin",
+                role_id=super_admin_role.id if super_admin_role else None,
+                role="super_admin",
                 status="active",
                 must_change_password=True,
             ))
             db.commit()
-        if not db.query(Store).first():
-            db.add(Store(store_name="Amazon JP 01", store_code="JP01", platform="Amazon", marketplace="JP", status="active"))
+        if rbac_ready:
+            seed_permissions_and_roles(db)
+        if rbac_ready and not db.query(Store).first():
+            db.add(Store(store_name="Amazon JP 01", store_code="JP01", platform="Amazon", marketplace="JP", marketplace_id="A1VC38T7YXB528", status="active"))
             db.commit()
 
         if not db.query(ReplyTemplate).first():
@@ -87,6 +103,7 @@ app.include_router(conversations.router, prefix="/api/v1")
 app.include_router(messages.router, prefix="/api/v1")
 app.include_router(ai.router, prefix="/api/v1")
 app.include_router(amazon.router, prefix="/api/v1")
+app.include_router(admin.router, prefix="/api/v1")
 app.include_router(attachments.router, prefix="/api/v1")
 app.include_router(templates.router, prefix="/api/v1")
 app.include_router(tickets.router, prefix="/api/v1")

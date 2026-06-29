@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     ENV: str = "development"
     DATABASE_URL: str
     JWT_SECRET_KEY: str
+    CONFIG_ENCRYPTION_KEY: str | None = None
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     AI_PROVIDER: str = "openai"  # auto / openai / gemini / rule

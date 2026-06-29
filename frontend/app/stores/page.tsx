@@ -8,7 +8,9 @@ import type { Store } from "@/types";
 type StoreForm = {
   store_name: string;
   store_code: string;
+  marketplace_id: string;
   seller_id: string;
+  amazon_sync_enabled: boolean;
   status: string;
   note: string;
 };
@@ -16,7 +18,9 @@ type StoreForm = {
 const emptyForm: StoreForm = {
   store_name: "",
   store_code: "",
+  marketplace_id: "A1VC38T7YXB528",
   seller_id: "",
+  amazon_sync_enabled: false,
   status: "active",
   note: ""
 };
@@ -69,7 +73,9 @@ export default function StoresPage() {
     setForm({
       store_name: store.store_name || "",
       store_code: store.store_code || "",
+      marketplace_id: store.marketplace_id || "A1VC38T7YXB528",
       seller_id: store.seller_id || "",
+      amazon_sync_enabled: Boolean(store.amazon_sync_enabled),
       status: store.status || "active",
       note: store.note || ""
     });
@@ -123,7 +129,7 @@ export default function StoresPage() {
       <div className="page-header">
         <div>
           <h2>店铺管理</h2>
-          <p>V1 只管理 Amazon JP 店铺；后续接 Amazon 授权时会在这里绑定 Seller ID。</p>
+          <p>V1 只管理 Amazon JP 店铺；后续 Amazon 同步会使用这里的 Seller ID、Marketplace ID 和同步开关。</p>
         </div>
         <div className="summary-pill">共 {stores.length} 家店铺</div>
       </div>
@@ -138,8 +144,17 @@ export default function StoresPage() {
             <label>店铺编码</label>
             <input className="input" placeholder="例如：JP01" value={form.store_code} onChange={e => setForm({ ...form, store_code: e.target.value.toUpperCase() })} required />
 
+            <label>Marketplace ID</label>
+            <input className="input" placeholder="日本站默认 A1VC38T7YXB528" value={form.marketplace_id} onChange={e => setForm({ ...form, marketplace_id: e.target.value })} />
+
             <label>Seller ID</label>
-            <input className="input" placeholder="可先留空，接 Amazon API 时再填写" value={form.seller_id} onChange={e => setForm({ ...form, seller_id: e.target.value })} />
+            <input className="input" placeholder="Amazon Seller ID" value={form.seller_id} onChange={e => setForm({ ...form, seller_id: e.target.value })} />
+
+            <label>Amazon 同步</label>
+            <select className="select" value={form.amazon_sync_enabled ? "true" : "false"} onChange={e => setForm({ ...form, amazon_sync_enabled: e.target.value === "true" })}>
+              <option value="false">关闭</option>
+              <option value="true">启用</option>
+            </select>
 
             <label>状态</label>
             <select className="select" value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
@@ -175,7 +190,9 @@ export default function StoresPage() {
                 <th>编码</th>
                 <th>平台</th>
                 <th>站点</th>
+                <th>Marketplace ID</th>
                 <th>Seller ID</th>
+                <th>同步</th>
                 <th>状态</th>
                 <th>备注</th>
                 <th>操作</th>
@@ -188,7 +205,9 @@ export default function StoresPage() {
                   <td>{store.store_code}</td>
                   <td>{store.platform}</td>
                   <td>{store.marketplace}</td>
+                  <td>{store.marketplace_id || "A1VC38T7YXB528"}</td>
                   <td>{store.seller_id || <span className="muted">未绑定</span>}</td>
+                  <td><span className={`badge ${store.amazon_sync_enabled ? "success" : "muted-badge"}`}>{store.amazon_sync_enabled ? "启用" : "关闭"}</span></td>
                   <td><span className={`badge ${store.status === "active" ? "success" : "muted-badge"}`}>{store.status === "active" ? "启用" : "停用"}</span></td>
                   <td className="note-cell">{store.note}</td>
                   <td>
@@ -201,7 +220,7 @@ export default function StoresPage() {
                 </tr>
               ))}
               {filteredStores.length === 0 && (
-                <tr><td colSpan={8} className="empty-table">暂无店铺。请先新增一个 Amazon JP 店铺。</td></tr>
+                <tr><td colSpan={10} className="empty-table">暂无店铺。请先新增一个 Amazon JP 店铺。</td></tr>
               )}
             </tbody>
           </table>

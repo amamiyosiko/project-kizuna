@@ -12,6 +12,7 @@ from botocore.awsrequest import AWSRequest
 from botocore.credentials import Credentials
 
 from app.core.config import settings
+from app.services.app_config import get_config_value_fresh
 
 
 class AmazonSPAPIError(Exception):
@@ -35,12 +36,16 @@ def has_real_value(value: str | None) -> bool:
     return bool(value and value.strip() and value.strip() not in PLACEHOLDERS)
 
 
+def _cfg(key: str, default: str | None = None) -> str:
+    return get_config_value_fresh(key, default)
+
+
 def marketplace_id() -> str:
-    return (settings.AMAZON_MARKETPLACE_ID or "A1VC38T7YXB528").strip()
+    return (_cfg("AMAZON_MARKETPLACE_ID", settings.AMAZON_MARKETPLACE_ID or "A1VC38T7YXB528") or "A1VC38T7YXB528").strip()
 
 
 def spapi_region() -> str:
-    return (settings.AMAZON_REGION or "jp").strip().lower()
+    return (_cfg("AMAZON_REGION", settings.AMAZON_REGION or "jp") or "jp").strip().lower()
 
 
 def endpoint_for_region(region: str | None = None) -> str:
@@ -62,10 +67,13 @@ def signing_region_for_endpoint(endpoint: str) -> str:
 
 
 def get_lwa_access_token() -> dict[str, Any]:
+    client_id = _cfg("AMAZON_LWA_CLIENT_ID", settings.AMAZON_LWA_CLIENT_ID or "")
+    client_secret = _cfg("AMAZON_LWA_CLIENT_SECRET", settings.AMAZON_LWA_CLIENT_SECRET or "")
+    refresh_token = _cfg("AMAZON_REFRESH_TOKEN", settings.AMAZON_REFRESH_TOKEN or "")
     required = {
-        "AMAZON_LWA_CLIENT_ID": settings.AMAZON_LWA_CLIENT_ID,
-        "AMAZON_LWA_CLIENT_SECRET": settings.AMAZON_LWA_CLIENT_SECRET,
-        "AMAZON_REFRESH_TOKEN": settings.AMAZON_REFRESH_TOKEN,
+        "AMAZON_LWA_CLIENT_ID": client_id,
+        "AMAZON_LWA_CLIENT_SECRET": client_secret,
+        "AMAZON_REFRESH_TOKEN": refresh_token,
     }
     missing = [k for k, v in required.items() if not has_real_value(v)]
     if missing:
@@ -75,9 +83,9 @@ def get_lwa_access_token() -> dict[str, Any]:
         "https://api.amazon.com/auth/o2/token",
         data={
             "grant_type": "refresh_token",
-            "refresh_token": settings.AMAZON_REFRESH_TOKEN,
-            "client_id": settings.AMAZON_LWA_CLIENT_ID,
-            "client_secret": settings.AMAZON_LWA_CLIENT_SECRET,
+            "refresh_token": refresh_token,
+            "client_id": client_id,
+            "client_secret": client_secret,
         },
         headers={"Content-Type": "application/x-www-form-urlencoded;charset=UTF-8"},
         timeout=20,
@@ -111,7 +119,7 @@ def call_spapi(
     data = json.dumps(body, ensure_ascii=False).encode("utf-8") if body is not None else None
     headers = {
         "host": urlparse(endpoint).netloc,
-        "user-agent": "ProjectKizuna/0.3.4.1 (Language=Python/3.12)",
+        "user-agent": "ProjectKizuna/0.3.5 (Language=Python/3.12)",
         "x-amz-access-token": token,
         "accept": "application/json",
     }
@@ -171,6 +179,6 @@ def configuration_overview() -> dict[str, Any]:
         "endpoint_region": spapi_region(),
         "endpoint": endpoint,
         "signing_region": signing_region_for_endpoint(endpoint),
-        "lwa_ready": all(has_real_value(v) for v in [settings.AMAZON_LWA_CLIENT_ID, settings.AMAZON_LWA_CLIENT_SECRET, settings.AMAZON_REFRESH_TOKEN]),
+        "lwa_ready": all(has_real_value(v) for v in [_cfg("AMAZON_LWA_CLIENT_ID", settings.AMAZON_LWA_CLIENT_ID or ""), _cfg("AMAZON_LWA_CLIENT_SECRET", settings.AMAZON_LWA_CLIENT_SECRET or ""), _cfg("AMAZON_REFRESH_TOKEN", settings.AMAZON_REFRESH_TOKEN or "")]),
         "aws_signing_ready": bool(creds),
     }

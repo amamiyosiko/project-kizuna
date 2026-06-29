@@ -28,3 +28,5 @@ class UserProfile(BaseModel):
     role: str
     status: str
     must_change_password: bool = False
+    role_name: str | None = None
+    permissions: list[str] = []

@@ -25,7 +25,7 @@ class AmazonCredentialStatus(BaseModel):
 
 
 class AmazonStatusOut(BaseModel):
-    stage: str = "v0.3.4.1"
+    stage: str = "v0.3.5"
     mode: str = "production_spapi"
     auto_sync_enabled: bool = False
     ready_for_next_stage: bool = False

@@ -1,5 +1,6 @@
 from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 
 from app.db.base import Base
 
@@ -10,7 +11,56 @@ class Role(Base):
     name = Column(String(100), nullable=False)
     code = Column(String(50), unique=True, nullable=False, index=True)
     description = Column(Text)
+    status = Column(String(30), default="active")
+    is_system = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    permissions = relationship("RolePermission", back_populates="role", cascade="all, delete-orphan")
+
+
+class Permission(Base):
+    __tablename__ = "permissions"
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(100), unique=True, nullable=False, index=True)
+    name = Column(String(120), nullable=False)
+    group = Column(String(80), default="general")
+    description = Column(Text)
+    created_at = Column(DateTime, server_default=func.now())
+
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+    id = Column(Integer, primary_key=True, index=True)
+    role_id = Column(Integer, ForeignKey("roles.id"), nullable=False, index=True)
+    permission_id = Column(Integer, ForeignKey("permissions.id"), nullable=False, index=True)
+    created_at = Column(DateTime, server_default=func.now())
+    role = relationship("Role", back_populates="permissions")
+    permission = relationship("Permission")
+
+
+class SystemConfig(Base):
+    __tablename__ = "system_configs"
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String(120), unique=True, nullable=False, index=True)
+    group = Column(String(80), default="General")
+    label = Column(String(150))
+    value_encrypted = Column(Text)
+    is_secret = Column(Boolean, default=True)
+    updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    id = Column(Integer, primary_key=True, index=True)
+    actor_user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    action = Column(String(120), nullable=False, index=True)
+    resource_type = Column(String(80), index=True)
+    resource_id = Column(String(120))
+    detail = Column(Text)
+    ip_address = Column(String(80))
+    created_at = Column(DateTime, server_default=func.now(), index=True)
 
 
 class User(Base):
@@ -36,7 +86,9 @@ class Store(Base):
     store_code = Column(String(80), unique=True, nullable=False, index=True)
     platform = Column(String(50), default="Amazon")
     marketplace = Column(String(50), default="JP")
+    marketplace_id = Column(String(80), default="A1VC38T7YXB528")
     seller_id = Column(String(150))
+    amazon_sync_enabled = Column(Boolean, default=False)
     status = Column(String(30), default="active")
     note = Column(Text)
     created_at = Column(DateTime, server_default=func.now())
